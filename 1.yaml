@@ -1,0 +1,66 @@
+authentication:
+  - "local:snipa"
+
+proxy-providers:
+  all_provider:
+    type: http
+    url: "https://raw.githubusercontent.com/luxxuria/harvester/refs/heads/main/non_ru.txt"
+    interval: 18000
+    health-check:
+      enable: true
+      interval: 1200
+      url: "https://connectivitycheck.gstatic.com/generate_204"
+
+proxy-groups:
+  - name: "PROXY"
+    type: url-test
+    url: "https://connectivitycheck.gstatic.com/generate_204"
+    interval: 1200
+    tolerance: 100
+    lazy: true
+    use:
+      - all_provider
+
+#geodata-mode: true
+#geo-auto-update: true
+#geo-update-interval: 24
+
+#geox-url:
+#  geoip: "https://raw.githubusercontent.com/runetfreedom/russia-v2ray-rules-dat/release/geoip.dat"
+#  geosite: "https://raw.githubusercontent.com/runetfreedom/russia-v2ray-rules-dat/release/geosite.dat"
+
+rules:
+  - GEOSITE,category-ads-all,REJECT
+
+  - PROCESS-NAME,com.google.android.youtube,PROXY
+  - PROCESS-NAME,org.telegram.messenger,PROXY
+  - PROCESS-NAME,com.whatsapp,PROXY
+
+  - DOMAIN-SUFFIX,metacubex.one,PROXY
+
+  - GEOSITE,antifilter-download-community,PROXY
+  - GEOSITE,ru-blocked,PROXY
+  - GEOSITE,cloudflare,PROXY
+  - GEOSITE,meta,PROXY
+  
+  - GEOIP,ru-blocked-community,PROXY
+  - GEOIP,ru-blocked,PROXY
+  - GEOIP,cloudflare,PROXY
+  - GEOIP,cloudfront,PROXY
+  - GEOIP,facebook,PROXY
+  - GEOIP,telegram,PROXY
+  
+  - DOMAIN-SUFFIX,ru,DIRECT
+  - DOMAIN-SUFFIX,su,DIRECT
+  - DOMAIN-SUFFIX,xn--p1ai,DIRECT
+
+  - GEOSITE,yandex,DIRECT
+  - GEOSITE,vk,DIRECT
+  - GEOSITE,mailru,DIRECT
+  - GEOSITE,category-gov-ru,DIRECT
+  - GEOSITE,category-bank-ru,DIRECT
+  - GEOSITE,ru-available-only-inside,DIRECT
+  - GEOIP,ddos-guard,DIRECT
+  - GEOIP,RU,DIRECT
+
+  - MATCH,DIRECT
