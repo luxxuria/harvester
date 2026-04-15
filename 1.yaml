@@ -9,13 +9,13 @@ proxy-providers:
     path: ./my_proxies.yaml
     health-check:
       enable: true
-      interval: 60
+      interval: 600
       url: "https://connectivitycheck.gstatic.com/generate_204"
 proxy-groups:
   - name: "PROXY"
     type: url-test
     url: "https://connectivitycheck.gstatic.com/generate_204"
-    interval: 30
+    interval: 600
     tolerance: 100
     timeout: 3000
     lazy: false
