@@ -41,8 +41,10 @@ dns:
   nameserver:
     - 'https://8.8.8.8/dns-query'
     - 'https://1.1.1.1/dns-query'
-  direct-nameserver:
-    - 'https://xbox-dns.ru/dns-query'
+  nameserver-policy:
+    'geosite:openai': 'https://xbox-dns.ru/dns-query'
+    'geosite:youtube': 'https://8.8.8.8/dns-query'
+    'geosite:google': 'https://xbox-dns.ru/dns-query'
 
 rules:
   #- MATCH,PROXY #whitelist
