@@ -1,5 +1,5 @@
 authentication:
-  - "local:4f9A2b8C1E7d6F3G5h0J9k2L4M1n7P8q5R3t6V0w9X2y4Z1A7b9C"
+  - "local:JRZhF4SwTvdWDAyu3NTvZWr1dR8jM2nuDdGUyteCs8NngPgSBB9XftgeWLgmTPa4"
 
 proxy-providers:
   all_provider:
@@ -42,9 +42,8 @@ dns:
     - 'https://8.8.8.8/dns-query'
     - 'https://1.1.1.1/dns-query'
   nameserver-policy:
-    'geosite:openai': 'https://xbox-dns.ru/dns-query'
     'geosite:youtube': 'https://8.8.8.8/dns-query'
-    'geosite:google': 'https://xbox-dns.ru/dns-query'
+    'geosite:openai,google': 'https://xbox-dns.ru/dns-query'
 
 rules:
   #- MATCH,PROXY #whitelist
@@ -52,13 +51,9 @@ rules:
   - RULE-SET,private-domains,DIRECT
   - RULE-SET,category-ads,REJECT-DROP
   - RULE-SET,win-spy,REJECT-DROP
-  - PROCESS-NAME,com.google.android.youtube,PROXY
-  - PROCESS-NAME,org.telegram.messenger,PROXY
-  - PROCESS-NAME,com.whatsapp,PROXY
   - PROCESS-NAME,com.google.android.googlequicksearchbox,DIRECT
   - GEOSITE,youtube,PROXY
   - GEOSITE,google,DIRECT
-  - GEOIP,google,DIRECT,no-resolve
   - RULE-SET,twitch,DIRECT
   - RULE-SET,microsoft,DIRECT
   - RULE-SET,apple,DIRECT
@@ -66,6 +61,9 @@ rules:
   - RULE-SET,category-ru,DIRECT
   - RULE-SET,whitelist,DIRECT
   - RULE-SET,direct-ips,DIRECT
+  - GEOIP,youtube,PROXY,no-resolve
+  - GEOIP,google,DIRECT,no-resolve
+  - GEOIP,ru,DIRECT,no-resolve
   - IP-CIDR,::/0,REJECT-DROP,no-resolve
   - MATCH,PROXY
 
