@@ -54,6 +54,7 @@ rules:
   - PROCESS-NAME,com.google.android.googlequicksearchbox,DIRECT
   - GEOSITE,youtube,PROXY
   - GEOSITE,google,DIRECT
+  - GEOSITE,openai,DIRECT
   - RULE-SET,twitch,DIRECT
   - RULE-SET,microsoft,DIRECT
   - RULE-SET,apple,DIRECT
