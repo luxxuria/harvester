@@ -42,8 +42,8 @@ dns:
     - 'https://8.8.8.8/dns-query'
     - 'https://1.1.1.1/dns-query'
   nameserver-policy:
-    'geosite:youtube': 'https://8.8.8.8/dns-query'
-    'geosite:openai,google': 'https://xbox-dns.ru/dns-query'
+    'geosite:openai,google,spotify': 'https://xbox-dns.ru/dns-query'
+
 
 rules:
   #- MATCH,PROXY #whitelist
@@ -51,22 +51,32 @@ rules:
   - RULE-SET,private-domains,DIRECT
   - RULE-SET,category-ads,REJECT-DROP
   - RULE-SET,win-spy,REJECT-DROP
-  - PROCESS-NAME,com.google.android.googlequicksearchbox,DIRECT
-  - GEOSITE,youtube,PROXY
-  - GEOSITE,google,DIRECT
-  - GEOSITE,openai,DIRECT
-  - RULE-SET,twitch,DIRECT
-  - RULE-SET,microsoft,DIRECT
-  - RULE-SET,apple,DIRECT
-  - RULE-SET,pinterest,DIRECT
-  - RULE-SET,category-ru,DIRECT
-  - RULE-SET,whitelist,DIRECT
-  - RULE-SET,direct-ips,DIRECT
-  - GEOIP,youtube,PROXY,no-resolve
-  - GEOIP,google,DIRECT,no-resolve
-  - GEOIP,ru,DIRECT,no-resolve
-  - IP-CIDR,::/0,REJECT-DROP,no-resolve
-  - MATCH,PROXY
+  - PROCESS-NAME,org.telegram.messenger,PROXY
+  - PROCESS-NAME,com.whatsapp,PROXY
+  - PROCESS-NAME,com.google.android.youtube,PROXY
+  - PROCESS-NAME,com.android.vending,PROXY
+  - SUB-RULE,(PROCESS-NAME,com.android.chrome),browser-rules #andorid ex
+  - SUB-RULE,(PROCESS-NAME,firefox),browser-rules # pc ex
+  - MATCH,DIRECT
+
+sub-rules:
+  browser-rules:
+    - GEOSITE,youtube,PROXY
+    - GEOSITE,google,DIRECT
+    - GEOSITE,spotify,DIRECT
+    - GEOSITE,openai,DIRECT
+    - RULE-SET,twitch,DIRECT
+    - RULE-SET,microsoft,DIRECT
+    - RULE-SET,apple,DIRECT
+    - RULE-SET,pinterest,DIRECT
+    - RULE-SET,category-ru,DIRECT
+    - RULE-SET,whitelist,DIRECT
+    - RULE-SET,direct-ips,DIRECT
+    - GEOIP,youtube,PROXY,no-resolve
+    - GEOIP,google,DIRECT,no-resolve
+    - GEOIP,ru,DIRECT,no-resolve
+    - IP-CIDR,::/0,REJECT-DROP,no-resolve
+    - MATCH,PROXY
 
 rule-providers:
   private-domains:
