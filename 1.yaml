@@ -1,27 +1,6 @@
 authentication:
   - "local:JRZhF4SwTvdWDAyu3NTvZWr1dR8jM2nuDdGUyteCs8NngPgSBB9XftgeWLgmTPa4"
 
-proxy-providers:
-  all_provider:
-    type: http
-    url: "https://github.com/luxxuria/harvester/raw/refs/heads/main/speed_tested.txt"
-    interval: 3600
-    path: ./my_proxies.yaml
-    health-check:
-      enable: true
-      interval: 600
-      url: "https://connectivitycheck.gstatic.com/generate_204"
-proxy-groups:
-  - name: "PROXY"
-    type: url-test
-    url: "https://connectivitycheck.gstatic.com/generate_204"
-    interval: 600
-    tolerance: 100
-    timeout: 3000
-    lazy: false
-    use:
-      - all_provider
-
 dns:
   enable: true
   cache-algorithm: arc
@@ -42,43 +21,123 @@ dns:
     - 'https://8.8.8.8/dns-query'
     - 'https://1.1.1.1/dns-query'
   nameserver-policy:
-    'geosite:openai,google,spotify': 'https://xbox-dns.ru/dns-query'
+    'geosite:google,openai,spotify,twitch': 'https://xbox-dns.ru/dns-query'
 
+proxy-providers:
+  ig1:
+    type: http
+    url: "https://cdn.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile.txt"
+    interval: 3600
+    health-check:
+      enable: true
+      interval: 600
+      url: "https://connectivitycheck.gstatic.com/generate_204"
+  ig2:
+    type: http
+    url: "https://cdn.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile-2.txt"
+    interval: 3600
+    health-check:
+      enable: true
+      interval: 600
+      url: "https://connectivitycheck.gstatic.com/generate_204"
+  my_wl:
+    type: http
+    url: "https://cdn.jsdelivr.net/gh/luxxuria/harvester@main/speed_tested.txt"
+    interval: 3600
+    health-check:
+      enable: true
+      interval: 600
+      url: "https://connectivitycheck.gstatic.com/generate_204"
+  my_bl:
+    type: http
+    url: "https://cdn.jsdelivr.net/gh/luxxuria/harvester@main/non_ru.txt"
+    interval: 3600
+    health-check:
+      enable: true
+      interval: 600
+      url: "https://connectivitycheck.gstatic.com/generate_204"
+
+proxy-groups:
+  - name: PROXY
+    type: select
+    proxies:
+      - my_bl
+      - my_wl
+      - ig
+  - name: my_bl
+    type: url-test
+    url: "https://connectivitycheck.gstatic.com/generate_204"
+    interval: 600
+    tolerance: 100
+    timeout: 3000
+    use:
+      - my_bl
+  - name: my_wl
+    type: url-test
+    url: "https://connectivitycheck.gstatic.com/generate_204"
+    interval: 600
+    tolerance: 100
+    timeout: 3000
+    use:
+      - my_wl
+  - name: ig
+    type: url-test
+    url: "https://connectivitycheck.gstatic.com/generate_204"
+    interval: 600
+    tolerance: 100
+    timeout: 3000
+    use:
+      - ig1
+      - ig2
 
 rules:
   #- MATCH,PROXY #whitelist
   - RULE-SET,private-ips,DIRECT,no-resolve
   - RULE-SET,private-domains,DIRECT
+  - IP-CIDR,::/0,REJECT-DROP,no-resolve
   - RULE-SET,category-ads,REJECT-DROP
-  - RULE-SET,win-spy,REJECT-DROP
   - PROCESS-NAME,org.telegram.messenger,PROXY
   - PROCESS-NAME,com.whatsapp,PROXY
   - PROCESS-NAME,com.google.android.youtube,PROXY
   - PROCESS-NAME,com.android.vending,PROXY
-  - SUB-RULE,(PROCESS-NAME,com.android.chrome),browser-rules #andorid ex
-  - SUB-RULE,(PROCESS-NAME,firefox),browser-rules # pc ex
+  - SUB-RULE,(PROCESS-NAME,com.android.chrome),browser-rules
   - MATCH,DIRECT
 
 sub-rules:
   browser-rules:
-    - GEOSITE,youtube,PROXY
-    - GEOSITE,google,DIRECT
-    - GEOSITE,spotify,DIRECT
-    - GEOSITE,openai,DIRECT
-    - RULE-SET,twitch,DIRECT
-    - RULE-SET,microsoft,DIRECT
-    - RULE-SET,apple,DIRECT
-    - RULE-SET,pinterest,DIRECT
-    - RULE-SET,category-ru,DIRECT
-    - RULE-SET,whitelist,DIRECT
-    - RULE-SET,direct-ips,DIRECT
-    - GEOIP,youtube,PROXY,no-resolve
-    - GEOIP,google,DIRECT,no-resolve
-    - GEOIP,ru,DIRECT,no-resolve
-    - IP-CIDR,::/0,REJECT-DROP,no-resolve
-    - MATCH,PROXY
+  - RULE-SET,whitelist,DIRECT
+  - RULE-SET,direct-ips,DIRECT
+  - RULE-SET,category-ru,DIRECT
+  - RULE-SET,ru-whitelist,DIRECT,no-resolve
+  - RULE-SET,ddos-guard,DIRECT,no-resolve
+  - GEOIP,ru,DIRECT,no-resolve
+  - GEOSITE,youtube,PROXY
+  - GEOSITE,google,DIRECT
+  - GEOSITE,openai,DIRECT
+  - GEOSITE,spotify,DIRECT
+  - GEOSITE,twitch,DIRECT
+  - RULE-SET,pinterest,DIRECT
+  - GEOIP,youtube,PROXY,no-resolve
+  - GEOIP,google,DIRECT,no-resolve
+  - MATCH,PROXY
 
 rule-providers:
+  ru-whitelist:
+    type: http
+    behavior: ipcidr
+    format: mrs
+    url: https://raw.githubusercontent.com/runetfreedom/russia-blocked-geoip/release/mrs/ru-whitelist.mrs
+    path: ./ruleset/ru-whitelist.mrs
+    proxy: PROXY
+    interval: 86400
+  ddos-guard:
+    type: http
+    behavior: ipcidr
+    format: mrs
+    url: https://raw.githubusercontent.com/runetfreedom/russia-blocked-geoip/release/mrs/ddos-guard.mrs
+    path: ./ruleset/ddos-guard.mrs
+    proxy: PROXY
+    interval: 86400
   private-domains:
     type: http
     behavior: domain
@@ -103,30 +162,6 @@ rule-providers:
     path: ./ruleset/whitelist.mrs
     proxy: PROXY
     interval: 86400
-  microsoft:
-    type: http
-    behavior: domain
-    format: mrs
-    url: https://cdn.jsdelivr.net/gh/hydraponique/roscomvpn-geosite/release/mihomo/microsoft.mrs
-    path: ./ruleset/microsoft.mrs
-    proxy: PROXY
-    interval: 86400
-  apple:
-    type: http
-    behavior: domain
-    format: mrs
-    url: https://cdn.jsdelivr.net/gh/hydraponique/roscomvpn-geosite/release/mihomo/apple.mrs
-    path: ./ruleset/apple.mrs
-    proxy: PROXY
-    interval: 86400
-  twitch:
-    type: http
-    behavior: domain
-    format: mrs
-    url: https://cdn.jsdelivr.net/gh/hydraponique/roscomvpn-geosite/release/mihomo/twitch.mrs
-    path: ./ruleset/twitch.mrs
-    proxy: PROXY
-    interval: 86400
   pinterest:
     type: http
     behavior: domain
@@ -149,14 +184,6 @@ rule-providers:
     format: mrs
     url: https://cdn.jsdelivr.net/gh/hydraponique/roscomvpn-geoip/release/mihomo/direct.mrs
     path: ./ruleset/direct-ips.mrs
-    proxy: PROXY
-    interval: 86400
-  win-spy:
-    type: http
-    behavior: domain
-    format: mrs
-    url: https://cdn.jsdelivr.net/gh/hydraponique/roscomvpn-geosite/release/mihomo/win-spy.mrs
-    path: ./ruleset/win-spy.mrs
     proxy: PROXY
     interval: 86400
   category-ads:
