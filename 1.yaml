@@ -1,9 +1,19 @@
+mixed-port: 33333
 authentication:
-  - "local:JRZhF4SwTvdWDAyu3NTvZWr1dR8jM2nuDdGUyteCs8NngPgSBB9XftgeWLgmTPa4"
+  - "local:Lnn8pw8AMirTmU7AXO2m8f29QQPa6XHUeRXuKO6Uxy69zZPDy7ZsfQ5Pli1wi4Bo"
+allow-lan: false
+bind-address: "*"
+mode: rule
+log-level: silent
+ipv6: false
+find-process-mode: always
+unified-delay: true
+tcp-concurrent: true
 
 dns:
   enable: true
   cache-algorithm: arc
+  prefer-h3: false
   use-hosts: false
   use-system-hosts: false
   respect-rules: false
@@ -17,17 +27,30 @@ dns:
   fake-ip-filter-mode: 'blacklist'
   fake-ip-filter:
     - '*.lan'
+  nameserver-policy:
+    'geosite:google,openai,spotify,twitch': 'https://xbox-dns.ru/dns-query'  
   nameserver:
     - 'https://8.8.8.8/dns-query'
     - 'https://1.1.1.1/dns-query'
-  nameserver-policy:
-    'geosite:google,openai,spotify,twitch': 'https://xbox-dns.ru/dns-query'
+
+sniffer:
+  enable: true
+  parse-pure-ip: true
+  override-destination: true
+  sniff:
+    HTTP:
+      ports: [80, 8080-8880]
+    TLS:
+      ports: [443, 8443]
+    QUIC:
+      ports: [443, 8443]
 
 proxy-providers:
   ig1:
     type: http
     url: "https://cdn.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile.txt"
     interval: 3600
+    path: ./providers/ig1.yaml
     health-check:
       enable: true
       interval: 600
@@ -36,6 +59,16 @@ proxy-providers:
     type: http
     url: "https://cdn.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile-2.txt"
     interval: 3600
+    path: ./providers/ig2.yaml
+    health-check:
+      enable: true
+      interval: 600
+      url: "https://connectivitycheck.gstatic.com/generate_204"
+  etoneya:
+    type: http
+    url: "https://etoneya.su/whitelist"
+    interval: 3600
+    path: ./providers/etoneya.yaml
     health-check:
       enable: true
       interval: 600
@@ -44,14 +77,7 @@ proxy-providers:
     type: http
     url: "https://cdn.jsdelivr.net/gh/luxxuria/harvester@main/speed_tested.txt"
     interval: 3600
-    health-check:
-      enable: true
-      interval: 600
-      url: "https://connectivitycheck.gstatic.com/generate_204"
-  my_bl:
-    type: http
-    url: "https://cdn.jsdelivr.net/gh/luxxuria/harvester@main/non_ru.txt"
-    interval: 3600
+    path: ./providers/my_wl.yaml
     health-check:
       enable: true
       interval: 600
@@ -61,34 +87,26 @@ proxy-groups:
   - name: PROXY
     type: select
     proxies:
-      - my_bl
       - my_wl
-      - ig
-  - name: my_bl
-    type: url-test
-    url: "https://connectivitycheck.gstatic.com/generate_204"
-    interval: 600
-    tolerance: 100
-    timeout: 3000
-    use:
-      - my_bl
+      - other
   - name: my_wl
     type: url-test
     url: "https://connectivitycheck.gstatic.com/generate_204"
     interval: 600
-    tolerance: 100
+    tolerance: 50
     timeout: 3000
     use:
       - my_wl
-  - name: ig
+  - name: other
     type: url-test
     url: "https://connectivitycheck.gstatic.com/generate_204"
     interval: 600
-    tolerance: 100
+    tolerance: 50
     timeout: 3000
     use:
       - ig1
       - ig2
+      - etoneya
 
 rules:
   #- MATCH,PROXY #whitelist
@@ -96,15 +114,6 @@ rules:
   - RULE-SET,private-domains,DIRECT
   - IP-CIDR,::/0,REJECT-DROP,no-resolve
   - RULE-SET,category-ads,REJECT-DROP
-  - PROCESS-NAME,org.telegram.messenger,PROXY
-  - PROCESS-NAME,com.whatsapp,PROXY
-  - PROCESS-NAME,com.google.android.youtube,PROXY
-  - PROCESS-NAME,com.android.vending,PROXY
-  - SUB-RULE,(PROCESS-NAME,com.android.chrome),browser-rules
-  - MATCH,DIRECT
-
-sub-rules:
-  browser-rules:
   - RULE-SET,whitelist,DIRECT
   - RULE-SET,direct-ips,DIRECT
   - RULE-SET,category-ru,DIRECT
@@ -120,6 +129,10 @@ sub-rules:
   - GEOIP,youtube,PROXY,no-resolve
   - GEOIP,google,DIRECT,no-resolve
   - MATCH,PROXY
+
+profile:
+  store-selected: false
+  store-fake-ip: true
 
 rule-providers:
   ru-whitelist:
