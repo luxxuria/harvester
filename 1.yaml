@@ -127,7 +127,7 @@ rule-providers:
     type: http
     behavior: ipcidr
     format: mrs
-    url: https://raw.githubusercontent.com/runetfreedom/russia-blocked-geoip/release/mrs/ru-whitelist.mrs
+    url: http://cdn.jsdelivr.net/gh/runetfreedom/russia-blocked-geoip@release/mrs/ru-whitelist.mrs
     path: ./ruleset/ru-whitelist.mrs
     proxy: PROXY
     interval: 86400
@@ -135,7 +135,7 @@ rule-providers:
     type: http
     behavior: ipcidr
     format: mrs
-    url: https://raw.githubusercontent.com/runetfreedom/russia-blocked-geoip/release/mrs/ddos-guard.mrs
+    url: https://cdn.jsdelivr.net/gh/runetfreedom/russia-blocked-geoip@release/mrs/ddos-guard.mrs
     path: ./ruleset/ddos-guard.mrs
     proxy: PROXY
     interval: 86400
