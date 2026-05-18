@@ -33,18 +33,6 @@ dns:
     - 'https://8.8.8.8/dns-query'
     - 'https://1.1.1.1/dns-query'
 
-sniffer:
-  enable: true
-  parse-pure-ip: true
-  override-destination: true
-  sniff:
-    HTTP:
-      ports: [80, 8080-8880]
-    TLS:
-      ports: [443, 8443]
-    QUIC:
-      ports: [443, 8443]
-
 proxy-providers:
   ig1:
     type: http
