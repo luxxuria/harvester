@@ -20,7 +20,7 @@ geox-url:
 dns:
   enable: true
   cache-algorithm: arc
-  prefer-h3: true
+  prefer-h3: false
   use-hosts: false
   use-system-hosts: false
   respect-rules: false
@@ -63,6 +63,15 @@ proxy-providers:
       enable: true
       interval: 600
       url: "https://connectivitycheck.gstatic.com/generate_204"
+  zieng2:
+    type: http
+    url: "https://cdn.jsdelivr.net/gh/zieng2/wl@main/vless_universal.txt"
+    interval: 3600
+    path: ./providers/zieng2.yaml
+    health-check:
+      enable: true
+      interval: 600
+      url: "https://connectivitycheck.gstatic.com/generate_204"
   my_wl:
     type: http
     url: "https://cdn.jsdelivr.net/gh/luxxuria/harvester@main/speed_tested.txt"
@@ -78,7 +87,8 @@ proxy-groups:
     type: select
     proxies:
       - my_wl
-      - other
+      - igareck
+      - zieng2
   - name: my_wl
     type: url-test
     url: "https://connectivitycheck.gstatic.com/generate_204"
@@ -87,7 +97,7 @@ proxy-groups:
     timeout: 3000
     use:
       - my_wl
-  - name: other
+  - name: igareck
     type: url-test
     url: "https://connectivitycheck.gstatic.com/generate_204"
     interval: 600
@@ -96,12 +106,25 @@ proxy-groups:
     use:
       - ig1
       - ig2
+  - name: zieng2
+    type: url-test
+    url: "https://connectivitycheck.gstatic.com/generate_204"
+    interval: 600
+    tolerance: 50
+    timeout: 3000
+    use:
+      - zieng2
 
 rules:
   - RULE-SET,private-ips,DIRECT,no-resolve
   - RULE-SET,private-domains,DIRECT
   - IP-CIDR,::/0,REJECT-DROP,no-resolve
   - RULE-SET,category-ads,REJECT-DROP
+  - PROCESS-NAME,org.telegram.messenger,PROXY
+  - PROCESS-NAME,com.whatsapp,PROXY
+  - PROCESS-NAME,com.google.android.youtube,PROXY
+  - PROCESS-NAME,com.android.vending,PROXY
+  - PROCESS-NAME,com.google.android.googlequicksearchbox,DIRECT
   - RULE-SET,whitelist,DIRECT
   - RULE-SET,direct-ips,DIRECT
   - RULE-SET,category-ru,DIRECT
@@ -117,10 +140,6 @@ rules:
   - GEOIP,youtube,PROXY,no-resolve
   - GEOIP,google,DIRECT,no-resolve
   - MATCH,PROXY
-
-profile:
-  store-selected: true
-  store-fake-ip: true
 
 rule-providers:
   ru-whitelist:
