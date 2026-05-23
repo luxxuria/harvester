@@ -4271,7 +4271,7 @@ proxy-groups:
 - name: PROXY
   type: url-test
   url: https://cp.cloudflare.com/generate_204
-  interval: 30
+  interval: 300
   timeout: 3000
   icon: https://www.vectorlogo.zone/logos/cloudflare/cloudflare-icon.svg
   proxies:
