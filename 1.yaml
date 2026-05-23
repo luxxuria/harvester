@@ -37,7 +37,7 @@ dns:
     - '*.local'
     - 'localhost'
   nameserver-policy:
-    'geosite:google,openai,spotify,twitch': 'https://xbox-dns.ru/dns-query'  
+    'geosite:google,openai,spotify,twitch,anthropic': 'https://xbox-dns.ru/dns-query'  
   nameserver:
     - 'https://8.8.8.8/dns-query'
     - 'https://1.1.1.1/dns-query'
@@ -135,6 +135,7 @@ rules:
   - GEOSITE,youtube,PROXY
   - GEOSITE,google,DIRECT
   - GEOSITE,openai,DIRECT
+  - GEOSITE,anthropic,DIRECT
   - GEOSITE,spotify,DIRECT
   - GEOSITE,twitch,DIRECT
   - GEOIP,youtube,PROXY,no-resolve
