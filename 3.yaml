@@ -1,0 +1,205 @@
+mixed-port: 33333
+authentication:
+  - "local:Lnn8pw8AMirTmU7AXO2m8f29QQPa6XHUeRXuKO6Uxy69zZPDy7ZsfQ5Pli1wi4Bo"
+allow-lan: false
+bind-address: "*"
+mode: rule
+log-level: info
+ipv6: false
+find-process-mode: always
+unified-delay: true
+tcp-concurrent: true
+geodata-mode: false
+geodata-loader: standard
+geo-auto-update: true
+geo-update-interval: 24
+geox-url:
+  mmdb: "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/country.mmdb"
+  geosite: "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geosite.dat"
+
+dns:
+  enable: true
+  cache-algorithm: arc
+  prefer-h3: false
+  use-hosts: false
+  use-system-hosts: false
+  respect-rules: false
+  listen: 0.0.0.0:1053
+  ipv6: false
+  default-nameserver:
+    - '8.8.8.8'
+    - '1.1.1.1'
+  enhanced-mode: 'fake-ip'
+  fake-ip-range: '198.18.0.1/16'
+  fake-ip-filter-mode: 'blacklist'
+  fake-ip-filter:
+    - '*.lan'
+    - '*.local'
+    - 'localhost'
+  nameserver-policy:
+    'geosite:google,openai,spotify,twitch,anthropic': 'https://xbox-dns.ru/dns-query'  
+  nameserver:
+    - 'https://8.8.8.8/dns-query'
+    - 'https://1.1.1.1/dns-query'
+    - 'https://9.9.9.9/dns-query'
+    - 'https://doh.opendns.com/dns-query'
+
+proxy-providers:
+  ig1:
+    type: http
+    url: "https://cdn.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile.txt"
+    interval: 3600
+    path: ./providers/ig1.yaml
+    health-check:
+      enable: true
+      interval: 600
+      url: "https://connectivitycheck.gstatic.com/generate_204"
+  ig2:
+    type: http
+    url: "https://cdn.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/Vless-Reality-White-Lists-Rus-Mobile-2.txt"
+    interval: 3600
+    path: ./providers/ig2.yaml
+    health-check:
+      enable: true
+      interval: 600
+      url: "https://connectivitycheck.gstatic.com/generate_204"
+  zieng2:
+    type: http
+    url: "https://cdn.jsdelivr.net/gh/zieng2/wl@main/vless_universal.txt"
+    interval: 3600
+    path: ./providers/zieng2.yaml
+    health-check:
+      enable: true
+      interval: 600
+      url: "https://connectivitycheck.gstatic.com/generate_204"
+  my_wl:
+    type: http
+    url: "https://cdn.jsdelivr.net/gh/luxxuria/harvester@main/speed_tested.txt"
+    interval: 3600
+    path: ./providers/my_wl.yaml
+    health-check:
+      enable: true
+      interval: 600
+      url: "https://connectivitycheck.gstatic.com/generate_204"
+
+proxy-groups:
+  - name: PROXY
+    type: select
+    proxies:
+      - my_wl
+      - igareck
+      - zieng2
+  - name: my_wl
+    type: select
+    use:
+      - my_wl
+  - name: igareck
+    type: select
+    use:
+      - ig1
+      - ig2
+  - name: zieng2
+    type: select
+    use:
+      - zieng2
+
+rules:
+  - RULE-SET,private-ips,DIRECT,no-resolve
+  - RULE-SET,private-domains,DIRECT
+  - IP-CIDR,::/0,REJECT-DROP,no-resolve
+  - RULE-SET,category-ads,REJECT-DROP
+  - PROCESS-NAME,org.telegram.messenger,PROXY
+  - PROCESS-NAME,com.whatsapp,PROXY
+  - PROCESS-NAME,com.google.android.youtube,PROXY
+  - PROCESS-NAME,com.android.vending,PROXY
+  - PROCESS-NAME,com.google.android.googlequicksearchbox,DIRECT
+  - RULE-SET,whitelist,DIRECT
+  - RULE-SET,direct-ips,DIRECT
+  - RULE-SET,category-ru,DIRECT
+  - RULE-SET,ru-whitelist,DIRECT,no-resolve
+  - RULE-SET,ddos-guard,DIRECT,no-resolve
+  - RULE-SET,pinterest,DIRECT
+  - GEOIP,ru,DIRECT,no-resolve
+  - GEOSITE,youtube,PROXY
+  - GEOSITE,google,DIRECT
+  - GEOSITE,openai,DIRECT
+  - GEOSITE,anthropic,DIRECT
+  - GEOSITE,spotify,DIRECT
+  - GEOSITE,twitch,DIRECT
+  - GEOIP,youtube,PROXY,no-resolve
+  - GEOIP,google,DIRECT,no-resolve
+  - MATCH,PROXY
+
+rule-providers:
+  ru-whitelist:
+    type: http
+    behavior: ipcidr
+    format: mrs
+    url: http://cdn.jsdelivr.net/gh/runetfreedom/russia-blocked-geoip@release/mrs/ru-whitelist.mrs
+    path: ./ruleset/ru-whitelist.mrs
+    proxy: PROXY
+    interval: 86400
+  ddos-guard:
+    type: http
+    behavior: ipcidr
+    format: mrs
+    url: https://cdn.jsdelivr.net/gh/runetfreedom/russia-blocked-geoip@release/mrs/ddos-guard.mrs
+    path: ./ruleset/ddos-guard.mrs
+    proxy: PROXY
+    interval: 86400
+  private-domains:
+    type: http
+    behavior: domain
+    format: mrs
+    url: https://cdn.jsdelivr.net/gh/hydraponique/roscomvpn-geosite/release/mihomo/private.mrs
+    path: ./ruleset/geosite-private.mrs
+    proxy: PROXY
+    interval: 2592000
+  category-ru:
+    type: http
+    behavior: domain
+    format: mrs
+    url: https://cdn.jsdelivr.net/gh/hydraponique/roscomvpn-geosite/release/mihomo/category-ru.mrs
+    path: ./ruleset/category-ru.mrs
+    proxy: PROXY
+    interval: 86400
+  whitelist:
+    type: http
+    behavior: domain
+    format: mrs
+    url: https://cdn.jsdelivr.net/gh/hydraponique/roscomvpn-geosite/release/mihomo/whitelist.mrs
+    path: ./ruleset/whitelist.mrs
+    proxy: PROXY
+    interval: 86400
+  pinterest:
+    type: http
+    behavior: domain
+    format: mrs
+    url: https://cdn.jsdelivr.net/gh/hydraponique/roscomvpn-geosite/release/mihomo/pinterest.mrs
+    path: ./ruleset/pinterest.mrs
+    proxy: PROXY
+    interval: 86400
+  private-ips:
+    type: http
+    behavior: ipcidr
+    format: mrs
+    url: https://cdn.jsdelivr.net/gh/hydraponique/roscomvpn-geoip/release/mihomo/private.mrs
+    path: ./ruleset/geoip-private.mrs
+    proxy: PROXY
+    interval: 2592000
+  direct-ips:
+    type: http
+    behavior: ipcidr
+    format: mrs
+    url: https://cdn.jsdelivr.net/gh/hydraponique/roscomvpn-geoip/release/mihomo/direct.mrs
+    path: ./ruleset/direct-ips.mrs
+    proxy: PROXY
+    interval: 86400
+  category-ads:
+    type: http
+    behavior: domain
+    format: mrs
+    url: https://cdn.jsdelivr.net/gh/hydraponique/roscomvpn-geosite/release/mihomo/category-ads.mrs
+    path: ./ruleset/category-ads.mrs
+    proxy: PROXY
+    interval: 86400
