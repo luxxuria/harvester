@@ -17,15 +17,20 @@ geox-url:
   mmdb: "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/country.mmdb"
   geosite: "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geosite.dat"
 
+secret: mihomo
+external-ui: ui # ----> http://127.0.0.1:33332/ui <----
+external-ui-url: https://github.com/MetaCubeX/metacubexd/releases/latest/download/compressed-dist.tgz
+external-controller: 127.0.0.1:33332
+
 dns:
   enable: true
   cache-algorithm: arc
   prefer-h3: false
   use-hosts: false
-  use-system-hosts: false
-  respect-rules: false
-  listen: 0.0.0.0:1053
-  ipv6: false
+  use-system-hosts: true
+  respect-rules: false # <-- какая разница куда ты будешь резолвить,
+  listen: 0.0.0.0:1053 # если запрос и так зашифрован по doh?
+  ipv6: false          # а еще резолв в direct быстрее будет 
   default-nameserver:
     - '8.8.8.8'
     - '1.1.1.1'
@@ -43,6 +48,18 @@ dns:
     - 'https://1.1.1.1/dns-query'
     - 'https://9.9.9.9/dns-query'
     - 'https://doh.opendns.com/dns-query'
+
+sniffer:
+  enable: true
+  parse-pure-ip: true
+  override-destination: false
+  sniff:
+    HTTP:
+      ports: [80, 8080-8880]
+    TLS:
+      ports: [443, 8443]
+    QUIC:
+      ports: [443, 8443]
 
 warp-common:
   type: wireguard
@@ -4408,26 +4425,19 @@ rules:
   - RULE-SET,private-domains,DIRECT
   - IP-CIDR,::/0,REJECT-DROP,no-resolve
   - RULE-SET,category-ads,REJECT-DROP
-  - PROCESS-NAME,org.telegram.messenger,PROXY
-  - PROCESS-NAME,com.whatsapp,PROXY
-  - PROCESS-NAME,com.google.android.youtube,PROXY
-  - PROCESS-NAME,com.android.vending,PROXY
-  - PROCESS-NAME,com.google.android.googlequicksearchbox,DIRECT
   - RULE-SET,whitelist,DIRECT
   - RULE-SET,direct-ips,DIRECT
   - RULE-SET,category-ru,DIRECT
   - RULE-SET,ru-whitelist,DIRECT,no-resolve
   - RULE-SET,ddos-guard,DIRECT,no-resolve
-  - RULE-SET,pinterest,DIRECT
   - GEOIP,ru,DIRECT,no-resolve
   - GEOSITE,youtube,PROXY
-  - GEOSITE,google,DIRECT
-  - GEOSITE,openai,DIRECT
-  - GEOSITE,anthropic,DIRECT
+  - GEOSITE,google,DIRECT     # gemini -> xbox-dns
+  - GEOSITE,openai,DIRECT     # gpt    -> xbox-dns
+  - GEOSITE,anthropic,DIRECT  # claude -> xbox-dns
   - GEOSITE,spotify,DIRECT
+  - RULE-SET,pinterest,DIRECT
   - GEOSITE,twitch,DIRECT
-  - GEOIP,youtube,PROXY,no-resolve
-  - GEOIP,google,DIRECT,no-resolve
   - MATCH,PROXY
 
 rule-providers:
