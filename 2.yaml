@@ -6,7 +6,6 @@ bind-address: "*"
 mode: rule
 log-level: info
 ipv6: false
-find-process-mode: always
 unified-delay: true
 tcp-concurrent: true
 geodata-mode: false
@@ -28,9 +27,9 @@ dns:
   prefer-h3: false
   use-hosts: false
   use-system-hosts: true
-  respect-rules: false # <-- какая разница куда ты будешь резолвить,
+  respect-rules: false # <-- какая разница куда ты будешь резолвить
   listen: 0.0.0.0:1053 # если запрос и так зашифрован по doh?
-  ipv6: false          # а еще резолв в direct быстрее будет 
+  ipv6: false          # а еще так быстрее будет резолв
   default-nameserver:
     - '8.8.8.8'
     - '1.1.1.1'
@@ -42,9 +41,11 @@ dns:
     - '*.local'
     - 'localhost'
   nameserver-policy:
-    'geosite:google,openai,spotify,twitch,anthropic': 
+    'geosite:google,openai,spotify,twitch,anthropic':
         - 'https://xbox-dns.ru/dns-query'
-        - 'https://dns.comss.one/dns-query'
+        - 'https://dns.geohide.ru:8443'
+    'geosite:supercell':
+        - 'https://dns.geohide.ru:8443'
   nameserver:
     - 'https://8.8.8.8/dns-query'
     - 'https://1.1.1.1/dns-query'
@@ -4432,13 +4433,14 @@ rules:
   - RULE-SET,category-ru,DIRECT
   - RULE-SET,ru-whitelist,DIRECT,no-resolve
   - RULE-SET,ddos-guard,DIRECT,no-resolve
+  - RULE-SET,pinterest,DIRECT
   - GEOIP,ru,DIRECT,no-resolve
   - GEOSITE,youtube,PROXY
-  - GEOSITE,google,DIRECT     # gemini -> xbox-dns
-  - GEOSITE,openai,DIRECT     # gpt    -> xbox-dns
-  - GEOSITE,anthropic,DIRECT  # claude -> xbox-dns
+  - GEOSITE,google,DIRECT
+  - GEOSITE,openai,DIRECT
+  - GEOSITE,anthropic,DIRECT
   - GEOSITE,spotify,DIRECT
-  - RULE-SET,pinterest,DIRECT
+  - GEOSITE,supercell,DIRECT
   - GEOSITE,twitch,DIRECT
   - MATCH,PROXY
 
