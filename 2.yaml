@@ -4422,7 +4422,7 @@ proxy-groups:
   - 162.159.195.10:500
 
 rules:
-  - GEOIP,private-ips,DIRECT,no-resolve
+  - RULE-SET,private-ips,DIRECT,no-resolve
   - GEOSITE,private,DIRECT
   - IP-CIDR,::/0,REJECT-DROP,no-resolve
   - GEOSITE,category-ads,REJECT
@@ -4440,6 +4440,13 @@ rules:
   - MATCH,PROXY
 
 rule-providers:
+  private-ips:
+    type: http
+    behavior: ipcidr
+    format: mrs
+    url: "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geoip/private.mrs"
+    path: ./rules/private.mrs
+    interval: 2592000
   whitelist:
     type: http
     behavior: domain
