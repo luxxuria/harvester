@@ -4426,7 +4426,6 @@ rules:
   - GEOSITE,private,DIRECT
   - IP-CIDR,::/0,REJECT-DROP,no-resolve
   - GEOSITE,category-ads,REJECT
-  - RULE-SET,ru-blocked,PROXY
   - GEOSITE,category-ru,DIRECT
   - RULE-SET,whitelist,DIRECT
   - GEOIP,ru,DIRECT,no-resolve
@@ -4453,11 +4452,4 @@ rule-providers:
     format: mrs
     url: https://cdn.jsdelivr.net/gh/hydraponique/roscomvpn-geosite/release/mihomo/whitelist.mrs
     path: ./ruleset/whitelist.mrs
-    interval: 86400
-  ru-blocked:
-    type: http
-    behavior: domain
-    format: text
-    url: https://cdn.jsdelivr.net/gh/runetfreedom/russia-blocked-geosite@release/ru-blocked.txt
-    path: ./ruleset/ru-blocked.txt
     interval: 86400
