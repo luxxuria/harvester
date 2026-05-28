@@ -14,7 +14,7 @@ geo-auto-update: true
 geo-update-interval: 24
 geox-url:
   mmdb: "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/country.mmdb"
-  geosite: "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geosite.dat"
+  geosite: "https://raw.githubusercontent.com/runetfreedom/russia-blocked-geosite/release/geosite.dat"
 
 secret: mihomo
 external-ui: ui # ----> http://127.0.0.1:33332/ui <----
@@ -27,10 +27,12 @@ dns:
   prefer-h3: false
   use-hosts: false
   use-system-hosts: true
-  respect-rules: false # <-- какая разница куда ты будешь резолвить
-  listen: 0.0.0.0:1053 # если запрос и так зашифрован по doh?
-  ipv6: false          # а еще так быстрее будет резолв
+  respect-rules: false
+  listen: 0.0.0.0:1053
+  ipv6: false
   default-nameserver:
+    - '45.155.204.190'
+    - '111.88.96.50'
     - '8.8.8.8'
     - '1.1.1.1'
   enhanced-mode: 'fake-ip'
@@ -45,10 +47,10 @@ dns:
         - 'https://xbox-dns.ru/dns-query'
         - 'https://dns.geohide.ru:8443'
   nameserver:
+    - 'https://dns.geohide.ru:444/dns-query'
+    - 'https://xbox-dns.ru/dns-query'
     - 'https://8.8.8.8/dns-query'
     - 'https://1.1.1.1/dns-query'
-    - 'https://9.9.9.9/dns-query'
-    - 'https://doh.opendns.com/dns-query'
 
 sniffer:
   enable: true
@@ -137,7 +139,7 @@ rules:
   - RULE-SET,private-ips,DIRECT,no-resolve
   - GEOSITE,private,DIRECT
   - IP-CIDR,::/0,REJECT-DROP,no-resolve
-  - GEOSITE,category-ads,REJECT
+  - GEOSITE,category-ads-all,REJECT
   - GEOSITE,category-ru,DIRECT
   - RULE-SET,whitelist,DIRECT
   - GEOIP,ru,DIRECT,no-resolve
