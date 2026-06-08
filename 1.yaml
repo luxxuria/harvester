@@ -1,5 +1,5 @@
 mixed-port: 33333
-bind-address: "*"
+bind-address: "127.0.0.1"
 allow-lan: false
 mode: rule
 log-level: info
@@ -27,26 +27,23 @@ dns:
   listen: 0.0.0.0:1053
   ipv6: false
   default-nameserver:
-    - '45.155.204.190'
-    - '111.88.96.50'
-    - '8.8.8.8'
-    - '1.1.1.1'
-  enhanced-mode: 'fake-ip'
-  fake-ip-range: '198.18.0.1/16'
-  fake-ip-filter-mode: 'blacklist'
+    - 45.155.204.190 # geohide
+    - 111.88.96.50 # xbox
+    - 8.8.8.8
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  fake-ip-filter-mode: rule
   fake-ip-filter:
-    - '*.lan'
-    - '*.local'
-    - 'localhost'
+    - GEOSITE,private,real-ip
+    - MATCH,fake-ip
   nameserver-policy:
     'geosite:google-deepmind,openai,spotify,twitch,anthropic':
-      - 'https://xbox-dns.ru/dns-query'
-      - 'https://dns.geohide.ru:444/dns-query'
+      - https://dns.geohide.ru:444/dns-query
+      - https://xbox-dns.ru/dns-query
   nameserver:
-    - 'https://dns.geohide.ru:444/dns-query'
-    - 'https://xbox-dns.ru/dns-query'
-    - 'https://8.8.8.8/dns-query'
-    - 'https://1.1.1.1/dns-query'
+    - https://dns.geohide.ru:444/dns-query
+    - https://xbox-dns.ru/dns-query
+    - https://dns.google/dns-query
 
 sniffer:
   enable: true
@@ -141,8 +138,8 @@ rules:
   - GEOSITE,openai,DIRECT
   - GEOSITE,anthropic,DIRECT
   - GEOSITE,spotify,DIRECT
-  - GEOSITE,pinterest,DIRECT
   - GEOSITE,twitch,DIRECT
+  - GEOSITE,pinterest,DIRECT
   - MATCH,PROXY
 
 rule-providers:
