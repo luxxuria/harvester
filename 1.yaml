@@ -104,10 +104,10 @@ proxy-groups:
   - name: PROXY
     type: select
     proxies:
-      - custom
-      - igareck
       - warp-auto
       - warp-select
+      - custom
+      - igareck
   - name: custom
     <<: *url_test
     use:
