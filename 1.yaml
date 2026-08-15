@@ -17,19 +17,24 @@ external-ui: ui # --> http://127.0.0.1:33332/ui/#/setup?hostname=127.0.0.1&port=
 external-ui-url: https://github.com/MetaCubeX/metacubexd/releases/latest/download/compressed-dist.tgz
 external-controller: 127.0.0.1:33332
 
+hosts:
+  'xbox-dns.ru': 111.88.96.50
+  'dns.geohide.ru': 45.155.204.190
+
 dns:
   enable: true
   cache-algorithm: arc
   prefer-h3: false
-  use-hosts: false
+  use-hosts: true
   use-system-hosts: false
   respect-rules: false
   listen: 0.0.0.0:1053
   ipv6: false
   default-nameserver:
-    - 45.155.204.190 # geohide
-    - 111.88.96.50 # xbox
     - 8.8.8.8
+    - 1.1.1.1
+    - 111.88.96.50 # xbox
+    - 45.155.204.190 # geohide
   enhanced-mode: fake-ip
   fake-ip-range: 198.18.0.1/16
   fake-ip-filter-mode: rule
@@ -37,12 +42,14 @@ dns:
     - GEOSITE,private,real-ip
     - MATCH,fake-ip
   nameserver-policy:
-    'geosite:google-deepmind,openai,spotify,twitch,anthropic':
-      - https://dns.geohide.ru:444/dns-query
+    'geosite:openai,spotify,twitch,anthropic':
       - https://xbox-dns.ru/dns-query
+    'geosite:google-deepmind':
+      - https://xbox-dns.ru/dns-query
+    #  - https://dns.geohide.ru:444/dns-query
   nameserver:
-    - https://dns.geohide.ru:444/dns-query
     - https://xbox-dns.ru/dns-query
+    - https://dns.geohide.ru:444/dns-query
     - https://dns.google/dns-query
 
 sniffer:
@@ -81,10 +88,10 @@ proxy-providers:
     path: ./providers/warp-endpoints.yaml
     interval: 72000
     <<: *health_check
-  speed_tested:
+  non_ru:
     type: http
-    url: "https://cdn.jsdelivr.net/gh/luxxuria/harvester@main/speed_tested.txt"
-    path: ./providers/speed_tested.yaml
+    url: "https://cdn.jsdelivr.net/gh/luxxuria/harvester@main/non_ru.txt"
+    path: ./providers/non_ru.yaml
     interval: 3600
     <<: *health_check
   ig1:
@@ -120,7 +127,7 @@ proxy-groups:
   - name: custom
     <<: *url_test
     use:
-      - speed_tested
+      - non_ru
   - name: igareck
     <<: *url_test
     use:
@@ -132,9 +139,13 @@ rules:
   - RULE-SET,private-ips,DIRECT,no-resolve
   - GEOSITE,private,DIRECT
   - IP-CIDR,::/0,REJECT,no-resolve
-  - GEOSITE,category-ads-all,REJECT
+  - RULE-SET,oisd_big,REJECT-DROP
+  - GEOSITE,category-ads-all,REJECT-DROP
+  - GEOSITE,tiktok,custom
   - GEOSITE,category-ru,DIRECT
   - RULE-SET,whitelist,DIRECT
+  - RULE-SET,wld,DIRECT
+  - RULE-SET,wldc,DIRECT
   - GEOSITE,youtube,PROXY
   - GEOSITE,google,DIRECT
   - GEOSITE,openai,DIRECT
@@ -144,18 +155,25 @@ rules:
   - GEOSITE,pinterest,DIRECT
   - MATCH,PROXY
 
+
 rule-providers:
+  oisd_big:
+    <<: *domain
+    url: "https://fastly.jsdelivr.net/gh/legiz-ru/mihomo-rule-sets@main/oisd/big.mrs"
+    path: ./rule-sets/oisd_big.mrs
+  wld:
+    <<: *domain
+    url: "https://fastly.jsdelivr.net/gh/legiz-ru/mihomo-rule-sets@main/other/wld.mrs"
+    path: ./rule-sets/wld.mrs
+  wldc:
+    <<: *classical
+    url: "https://fastly.jsdelivr.net/gh/legiz-ru/mihomo-rule-sets@main/other/wldc.yaml"
+    path: ./rule-sets/wldc.yaml
   private-ips:
-    type: http
-    behavior: ipcidr
-    format: mrs
+    <<: *ip
     url: "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geoip/private.mrs"
-    path: ./ruleset/private-ips.mrs
-    interval: 2592000
+    path: ./rule-sets/private.mrs
   whitelist:
-    type: http
-    behavior: domain
-    format: mrs
+    <<: *domain
     url: https://fastly.jsdelivr.net/gh/hydraponique/roscomvpn-geosite/release/mihomo/whitelist.mrs
-    path: ./ruleset/whitelist.mrs
-    interval: 86400
+    path: ./rule-sets/whitelist.mrs
