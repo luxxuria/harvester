@@ -5,7 +5,7 @@ If `github` is unreachable or blocked in your country, you can access any file b
 * **jsDelivr:** `https://cdn.jsdelivr.net/gh/luxxuria/harvester@main/FILENAME.txt`
 * **GitHack:** `https://raw.githack.com/luxxuria/harvester/main/FILENAME.txt`
 
-*Replace `FILENAME.txt` with: `ping_tested.txt`, `speed_tested.txt`, `top_600.txt`, or `non_ru.txt`.*
+*Replace `FILENAME.txt` with: `ping_tested.txt`, `speed_tested.txt`, or `non_ru.txt`.*
 
 <br>
 
@@ -27,9 +27,9 @@ If `github` is unreachable or blocked in your country, you can access any file b
 * **Метод**: Узлы, прошедшие успешную сессию передачи данных. Валидация включает установку соединения и проверку скорости загрузки тестового файла.
 * **Назначение**: Гарантированно рабочие конфигурации.
 
-### 3. top_600.txt
-* **Статус**: Оптимизированная выборка.
-* **Метод**: Срез наиболее быстрых узлов из общего списка. Для каждого интернет-провайдера (ASN) установлено жесткое ограничение на количество записей, чтобы избежать концентрации на одном хостинге и повысить отказоустойчивость сети.
+### 3. non_ru.txt
+* **Статус**: Географически очищенная и оптимизированная выборка.
+* **Метод**: Срез узлов из списка **speed_tested.txt**, из которого полностью исключены серверы с российской локацией (Non-RU).
 * **Назначение**: Использование в качестве основного источника для клиентов.
 
 ## Методология тестирования
@@ -37,7 +37,7 @@ If `github` is unreachable or blocked in your country, you can access any file b
 ### 1. Предварительная валидация (Normalization)
 На данном этапе выполняется синтаксический анализ URI и проверка на соответствие поддерживаемым спецификациям:
 * **Протоколы безопасности (Security):** Допускаются только `tls`, `reality` или `none`.
-* **Транспортные протоколы (Network):** Валидируются `tcp`, `ws`, `grpc`, `h2`, `xhttp` и `httpupgrade`.
+* **Транспортные протоколы (Network):** Валидируются `tcp` и `xhttp`.
 * Конфигурации с устаревшими методами шифрования или неподдерживаемыми типами транспорта исключаются из обработки.
 
 ### 2. Гео-аналитика
