@@ -1,327 +1,193 @@
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::{Duration, Instant};
-use std::process::Stdio;
-use tokio::sync::{mpsc, Semaphore};
-use tokio_util::sync::CancellationToken;
-use tokio::process::Command;
-use tokio::io::AsyncWriteExt;
-use futures_util::StreamExt;
-use chrono::Local;
+use crate::{
+    config::{
+        DNS_RESOLVER, IP_CHECK_TIMEOUT, SPEED_CHECK_TIMEOUT, SPEED_TEST_URL, TCP_CHECK_TIMEOUT,
+        TestResult, XRAY_PATH,
+    },
+    config_builder::create_config_from_url,
+    utils::{get_host_port, wait_port},
+};
+use anyhow::{Context as _, Result, bail};
+use futures_util::TryStreamExt as _;
+use percent_encoding::percent_decode_str;
+use reqwest::{Client, Proxy};
+use std::{
+    net::{IpAddr, SocketAddr},
+    process::Stdio,
+    sync::Arc,
+    time::{Duration, Instant},
+};
+use tokio::{
+    io::{AsyncReadExt as _, AsyncWriteExt as _},
+    net::TcpStream,
+    process::Command,
+    sync::Semaphore,
+    time::timeout,
+};
+use tokio_util::io::StreamReader;
 use url::Url;
 
-use crate::config::{TestOutput, XRAY_EXE, XrayGuard, TCP_MAX_CONCURRENT, PING_MAX_CONCURRENT, TEST_URL_204, TestResult, SPEED_TEST_THREADS, SPEED_TEST_URL, MIN_SPEED_THRESHOLD};
-use crate::config_builder;
-use crate::utils::{tcp_check, wait_port, fetch_outbound_ip};
+pub async fn test_proxy(
+    url: &str,
+    speed_sem: Arc<Semaphore>,
+    xray_port: u16,
+) -> Result<TestResult> {
+    let parsed = Url::parse(url)?;
 
+    let (host, port) = get_host_port(&parsed).context("impossible error")?;
+    tcp_check(host, port).await.context("tcp check error")?;
 
+    let json_cfg =
+        create_config_from_url(&parsed, xray_port).context("xray config creation error")?;
+    let bytes_cfg = serde_json::to_vec(&json_cfg).context("impossible error")?;
 
-async fn run_test_step(line: &str, url: &str, is_speed_test: bool) -> Option<TestOutput> {
-    const TARGET_SIZE: u64 = 30 * 1024 * 1024;
-    const SPEED_TIME_LIMIT: Duration = Duration::from_secs(10);
+    let mut child = Command::new(XRAY_PATH)
+        .args(["run", "-c", "stdin:"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .kill_on_drop(true)
+        .spawn()?;
 
-    // Assign timeout based on test type
-    let timeout = if is_speed_test {
-        Duration::from_secs(12)
-    } else {
-        Duration::from_secs(4)
-    };
-
-    let url_parsed = Url::parse(line).ok()?;
-    let mut active_child = None;
-    let mut active_port = 0;
-
-    // 1. Initialize Xray process (retry up to 2 times)
-    for _ in 0..2 {
-        let port = match std::net::TcpListener::bind("127.0.0.1:0") {
-            Ok(l) => l.local_addr().ok()?.port(),
-            Err(_) => continue,
-        };
-
-        let config = config_builder::create_config_from_url(&url_parsed, port);
-        let json_bytes = serde_json::to_vec(&config).ok()?;
-
-        let mut child = Command::new(XRAY_EXE)
-            .args(["run", "-c", "stdin:"])
-            .stdin(Stdio::piped())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .ok()?;
-
-        if let Some(mut stdin) = child.stdin.take() {
-            let _ = stdin.write_all(&json_bytes).await;
-            let _ = stdin.flush().await;
+    let fn_res = async {
+        {
+            let mut stdin = child.stdin.take().context("stdin take failed")?;
+            stdin.write_all(&bytes_cfg).await?;
+            stdin.flush().await?;
         }
 
-        // Wait until port is ready or process exits
-        let is_ready = tokio::select! {
-            ready = wait_port(port) => ready,
-            _ = child.wait() => false,
-            () = tokio::time::sleep(Duration::from_millis(700)) => false,
-        };
-
-        if is_ready {
-            active_child = Some(child);
-            active_port = port;
-            break;
+        if !wait_port(xray_port).await {
+            bail!("xray port wait timeout");
         }
 
-        let _ = child.kill().await;
-    }
+        let proxy = Proxy::all(format!("socks5h://127.0.0.1:{xray_port}"))?;
+        let client = Client::builder()
+            .proxy(proxy)
+            .tcp_nodelay(true)
+            .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            .timeout(Duration::from_secs(10))
+            .build()?;
 
-    let child = active_child?;
-    let _guard = XrayGuard { child };
-    let port = active_port;
+        let ip = get_server_ip(&client)
+            .await
+            .context("failed to get server ip")?;
 
-    let client = reqwest::Client::builder()
-        .proxy(reqwest::Proxy::all(format!("socks5h://127.0.0.1:{port}")).ok()?)
-        .timeout(timeout)
-        .danger_accept_invalid_certs(true)
-        .tcp_nodelay(true)
-        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-        .build()
-        .ok()?;
+        let _permit = speed_sem.acquire().await.context("impossible error")?;
 
-    let mut response = None;
+        let speed = get_server_speed(&client).await;
 
-    // 2. Retry request (handle cold start)
-    for _ in 0..2 {
-        let res = client.get(url).header("Connection", "close").send().await;
-
-        if let Ok(res_ok) = res && res_ok.status().is_success() {
-            response = Some(res_ok);
-            break;
-        }
-
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    }
-
-    let response_ok = response?;
-
-    // Return early for ping stage
-    if !is_speed_test {
-        return Some(TestOutput::PingSuccess);
-    }
-
-    // 3. Speed test stage
-    let fetched_ip = fetch_outbound_ip(&client).await;
-
-    let mut downloaded: u64 = 0;
-    let mut stream = response_ok.bytes_stream();
-    let test_start = Instant::now();
-
-    let _ = tokio::time::timeout(SPEED_TIME_LIMIT, async {
-        while let Some(item) = stream.next().await {
-            if let Ok(chunk) = item {
-                downloaded += chunk.len() as u64;
-                if downloaded >= TARGET_SIZE {
-                    break;
-                }
-            } else {
-                break;
+        #[allow(clippy::option_if_let_else)]
+        match speed {
+            Ok(speed) => {
+                let fragment = parsed.fragment().unwrap_or("");
+                let decoded_fragment = percent_decode_str(fragment).decode_utf8_lossy();
+                println!("validated: {speed} {decoded_fragment:.50}");
+                Ok(TestResult::Speed { speed, ip })
             }
+            Err(_) => Ok(TestResult::Ping),
         }
-    })
+    }
     .await;
 
-    let final_elapsed = test_start.elapsed().as_secs_f64();
+    let _unused = child.kill().await;
+    let _unsed = child.wait().await;
 
-    if final_elapsed > 0.01 && downloaded > 100_000 {
-        #[allow(clippy::cast_precision_loss)]
-        let mbps = (downloaded * 8) as f64 / (final_elapsed * 1_000_000.0);
-
-        if mbps > 1000.0 {
-            return None;
-        }
-
-        return Some(TestOutput::Full(mbps, fetched_ip));
-    }
-
-    None
+    fn_res
 }
 
-
-pub async fn stage_tcp_check(
-    raw_lines: Vec<String>,
-    tx_to_ping: mpsc::Sender<String>,
-    target_quota: usize,
-    found_count: Arc<AtomicUsize>,
-    token: CancellationToken,
-) {
-    let semaphore = Arc::new(Semaphore::new(TCP_MAX_CONCURRENT));
-    let mut set = tokio::task::JoinSet::new();
-
-    for node in raw_lines {
-        // Stop if cancellation requested
-        if token.is_cancelled() {
-            break;
-        }
-
-        // Stop if quota reached
-        if found_count.load(Ordering::Relaxed) >= target_quota {
-            break;
-        }
-
-        let Ok(permit) = semaphore.clone().acquire_owned().await else { 
-            break; // Semaphore closed
+async fn tcp_check(host: &str, port: u16) -> Result<()> {
+    let ip: IpAddr = if let Ok(ip) = host.parse() {
+        ip
+    } else {
+        let lookup = match DNS_RESOLVER.ipv4_lookup(host).await {
+            Ok(lookup) => lookup,
+            Err(err) if err.is_nx_domain() => {
+                anyhow::bail!("NXDomain");
+            }
+            Err(err) if err.is_no_records_found() => {
+                anyhow::bail!("no IPv4 record for domain");
+            }
+            Err(err) => {
+                return Err(err).context("dns resolve failed");
+            }
         };
 
-        let tx = tx_to_ping.clone();
-        let t_inner = token.clone();
+        lookup
+            .answers()
+            .iter()
+            .find_map(|record| record.data.ip_addr())
+            .context("no ipv4 resolved")?
+    };
 
-        set.spawn(async move {
-            let _permit = permit;
+    let addr = SocketAddr::new(ip, port);
 
-            // Re-check cancellation after acquiring permit
-            if t_inner.is_cancelled() {
-                return;
-            }
+    let _unused = timeout(TCP_CHECK_TIMEOUT, TcpStream::connect(addr))
+        .await
+        .context("timeout")??;
 
-            if tcp_check(&node).await 
-                && !t_inner.is_cancelled() {
-                    let _ = tx.send(node).await;
-                }
-        });
-    }
-
-    // Wait for tasks only if not cancelled
-    if !token.is_cancelled() {
-        while (set.join_next().await).is_some() {}
-    }
+    Ok(())
 }
 
+async fn get_server_ip(client: &Client) -> Result<IpAddr> {
+    let req1 = client.get("https://api.ipify.org").send();
+    let req2 = client.get("https://ifconfig.me/ip").send();
 
-pub async fn stage_ping_test(
-    mut rx_from_tcp: mpsc::Receiver<String>,
-    tx_to_speed: mpsc::Sender<String>,
-    target_quota: usize,
-    found_count: Arc<AtomicUsize>,
-    token: CancellationToken,
-) -> Vec<String> {
-    let semaphore = Arc::new(Semaphore::new(PING_MAX_CONCURRENT));
-    let mut set = tokio::task::JoinSet::new();
-    let mut passed_nodes = Vec::new();
-
-    loop {
-        tokio::select! {
-            () = token.cancelled() => break, // Stop if cancelled
-            msg = rx_from_tcp.recv() => {
-                match msg {
-                    Some(node) => {
-                        if found_count.load(Ordering::Relaxed) >= target_quota { break; }
-
-                        let sem_handle = Arc::clone(&semaphore);
-                        let tx = tx_to_speed.clone();
-                        let t_inner = token.clone();
-
-                        set.spawn(async move {
-                            let _permit = sem_handle.acquire_owned().await.ok()?;
-                            if t_inner.is_cancelled() { return None; }
-
-                            if matches!(run_test_step(&node, TEST_URL_204, false).await, Some(TestOutput::PingSuccess)) {
-                                let _ = tx.send(node.clone()).await;
-                                return Some(node);
-                            }
-                            None
-                        });
-                    }
-                    None => break,
-                }
-            }
-        }
-    }
-
-    // Collect all nodes that passed before cancellation
-    while let Some(res) = set.join_next().await {
-        if let Ok(Some(node)) = res {
-            passed_nodes.push(node);
-        }
-    }
-
-    passed_nodes
+    timeout(IP_CHECK_TIMEOUT, async {
+        let resp = tokio::select! {
+            Ok(res) = req1 => res,
+            Ok(res) = req2 => res,
+            else => bail!("both connections failed"),
+        };
+        let ip = resp.text().await.context("response error")?;
+        ip.parse::<IpAddr>().context("not a valid ip response")
+    })
+    .await
+    .context("timeout")?
 }
 
+async fn get_server_speed(client: &Client) -> Result<u64> {
+    let connect_timeout = Duration::from_secs(3);
+    let max_bytes: u64 = 30 * 1024 * 1024;
+    let min_mbps = 48;
 
-pub async fn stage_speed_test(
-    mut rx_from_ping: mpsc::Receiver<String>,
-    tx_final: mpsc::Sender<TestResult>,
-    target_quota: usize,
-    found_count: Arc<AtomicUsize>,
-    token: CancellationToken,
-) {
-    let semaphore = Arc::new(Semaphore::new(SPEED_TEST_THREADS));
-    let mut set = tokio::task::JoinSet::new();
+    let response = timeout(connect_timeout, client.get(SPEED_TEST_URL).send())
+        .await
+        .context("connection timeout")?
+        .context("connection failed")?;
 
-    loop {
-        tokio::select! {
-            () = token.cancelled() => break,
-            msg = rx_from_ping.recv() => {
-                match msg {
-                    Some(node) => {
-                        if found_count.load(Ordering::Relaxed) >= target_quota { break; }
-
-                        let permit = semaphore.clone().acquire_owned().await.expect("Semaphore closed");
-                        let tx = tx_final.clone();
-                        let fc = Arc::clone(&found_count);
-                        let t_inner = token.clone();
-
-                        set.spawn(async move {
-                            let _permit = permit;
-                            if t_inner.is_cancelled() { return; }
-
-                            let mut final_res: Option<(f64, String)> = None;
-
-                            // Retry speed test up to 2 times
-                            for attempt in 1..=2 {
-                                if t_inner.is_cancelled() { return; }
-
-                                match run_test_step(&node, SPEED_TEST_URL, true).await {
-                                    Some(TestOutput::Full(speed, ip)) => {
-                                        final_res = Some((speed, ip));
-                                        if speed >= MIN_SPEED_THRESHOLD { break; }
-                                    }
-                                    _ => if attempt == 1 { tokio::time::sleep(Duration::from_millis(500)).await; }
-                                }
-                            }
-
-                            if let Some((speed, ip)) = final_res && speed >= MIN_SPEED_THRESHOLD {
-                                let name_dec = if let Some(raw_name) = node.split('#').next_back()
-                                    && node.contains('#')
-                                {
-                                    urlencoding::decode(raw_name)
-                                        .unwrap_or(std::borrow::Cow::Borrowed(raw_name))
-                                        .chars()
-                                        .take(30)
-                                        .collect::<String>()
-                                } else {
-                                    node.split('@').next_back()
-                                        .and_then(|s| s.split(':').next())
-                                        .unwrap_or("unknown")
-                                        .chars()
-                                        .take(30)
-                                        .collect::<String>()
-                                };
-
-                                let current_f = fc.fetch_add(1, Ordering::SeqCst) + 1;
-                                if current_f > target_quota { return; }
-
-                                println!(
-                                    "[{}] Node #{current_f}: {} | {:.2} Mbps",
-                                    Local::now().format("%H:%M:%S"),
-                                    name_dec,
-                                    speed
-                                );
-
-                                let _ = tx.send(TestResult { raw_url: node, speed, ip }).await;
-                            }
-                        });
-                    }
-                    None => break,
-                }
-            }
-        }
+    if !response.status().is_success() {
+        bail!("http status {}", response.status());
     }
 
-    // Do not wait for JoinSet tasks if cancelled or quota reached
+    let stream = response.bytes_stream().map_err(std::io::Error::other);
+    let mut reader = StreamReader::new(stream);
+    let mut buffer = [0u8; 8192];
+    let mut downloaded_bytes: u64 = 0;
+    let start = Instant::now();
+
+    timeout(SPEED_CHECK_TIMEOUT, async {
+        while downloaded_bytes < max_bytes {
+            let n = reader.read(&mut buffer).await?;
+            if n == 0 {
+                break;
+            }
+            downloaded_bytes += u64::try_from(n)?;
+        }
+        Ok::<(), anyhow::Error>(())
+    })
+    .await
+    .context("download timeout")?
+    .context("download failed")?;
+
+    let elapsed_ms = u64::try_from(start.elapsed().as_millis())?;
+
+    if elapsed_ms == 0 || downloaded_bytes == 0 {
+        bail!("empty response or elapsed time less than 0 ms");
+    }
+
+    let mbps = (downloaded_bytes * 1250) / (elapsed_ms * 131_072);
+
+    if mbps < min_mbps {
+        bail!("low speed")
+    }
+    Ok(mbps)
 }
