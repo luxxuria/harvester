@@ -1,175 +1,174 @@
-use std::collections::HashMap;
-use std::io;
-use maxminddb::{self, geoip2};
 use crate::TestResult;
+use crate::config::{
+    ASN_DB_PATH, COUNTRY_DB_PATH, NON_RU_PATH as NON_RU_LIST_PATH, NodeOutput, PING_RESULT_PATH,
+    SPEED_RESULT_PATH,
+};
+use anyhow::{Result, bail};
 use chrono::Local;
+use maxminddb::{self, Reader, path};
+use std::io;
+use std::net::IpAddr;
+use tokio::fs::File;
+use tokio::io::{AsyncWriteExt as _, BufWriter};
 
-const ASN_DB_PATH: &str = "core/GeoLite2-ASN.mmdb";
-const COUNTRY_DB_PATH: &str = "core/GeoLite2-Country.mmdb";
-const FULL_LIST_PATH: &str = "assets/speed_tested.txt";
-const PING_RESULT_PATH: &str = "assets/ping_tested.txt";
-const PROXYLIST_PATH: &str = "assets/top_600.txt";
+pub struct ProcessedNode<'a> {
+    pub url: String,
+    pub speed: u64,
+    pub iso_code: &'a str,
+}
 
-pub async fn finalize_and_save(results: Vec<TestResult>) -> io::Result<usize> {
-    // Open databases (fallback to defaults if unavailable)
-    let asn_db = maxminddb::Reader::open_readfile(ASN_DB_PATH).ok();
-    let country_db = maxminddb::Reader::open_readfile(COUNTRY_DB_PATH).ok();
+pub async fn finalize_and_save(results: Vec<NodeOutput>) -> Result<()> {
+    if results.is_empty() {
+        bail!("results is empty");
+    }
 
-    let mut entries: Vec<(String, f64, String)> = results
-        .into_iter()
-        .map(|node| {
-            let ip_addr: Option<std::net::IpAddr> = node.ip.parse().ok();
+    if let Err(err) = save_ping_results(&results).await {
+        eprintln!("failed to save ping tested: {err:?}");
+    }
 
-            // 1. Resolve country
-            let country_iso = ip_addr
-                .and_then(|addr| country_db.as_ref()?.lookup::<geoip2::Country>(addr).ok())
-                .and_then(|geo| geo.country?.iso_code)
-                .unwrap_or("XX");
+    let asn_reader = Reader::open_readfile(ASN_DB_PATH)?;
+    let country_reader = Reader::open_readfile(COUNTRY_DB_PATH)?;
 
-            // 2. Resolve provider (ASN)
-            let provider = ip_addr
-                .and_then(|addr| asn_db.as_ref()?.lookup::<geoip2::Asn>(addr).ok())
-                .and_then(|asn| asn.autonomous_system_organization)
-                .map_or_else(|| "Unknown".to_string(), clean_provider_name);
-
-            // 3. Extract name from URL (fallback if metadata unavailable)
-            let mut url_parts = node.raw_url.splitn(2, '#');
-            let base_url = url_parts.next().unwrap_or("");
-
-            let original_name = url_parts.next().map(|name_part| {
-                urlencoding::decode(name_part)
-                    .unwrap_or_default()
-                    .replace(['[', ']', '|'], "")
-                    .trim()
-                    .chars()
-                    .take(30)
-                    .collect::<String>()
-            });
-
-            // 4. Build formatted output line
-            let formatted_line = if country_iso != "XX" && provider != "Unknown" {
-                let flag = get_flag_emoji(country_iso);
-                format!("{base_url}#{flag}{:.0}Mb | {provider}", node.speed)
-            } else {
-                let name = original_name.unwrap_or_else(|| "Unnamed".to_string());
-                format!("{base_url}#🌐{:.0}Mb | {name}", node.speed)
-            };
-
-            (formatted_line, node.speed, provider)
+    let mut speed_entries: Vec<ProcessedNode<'_>> = results
+        .iter()
+        .filter_map(|node| match &node.result {
+            TestResult::Speed { speed, ip } => {
+                let speed = *speed;
+                let (url, iso_code) =
+                    process_speed_node(&node.url, speed, *ip, &country_reader, &asn_reader);
+                Some(ProcessedNode {
+                    url,
+                    speed,
+                    iso_code,
+                })
+            }
+            TestResult::Ping => None,
         })
         .collect();
 
-    // Sort by descending speed
-    entries.sort_by(|a, b| b.1.total_cmp(&a.1));
+    speed_entries.sort_unstable_by_key(|a| std::cmp::Reverse(a.speed));
 
-    // Save full results list
-    let full_content = entries
-        .iter()
-        .map(|(line, _, _)| line.as_str())
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    tokio::fs::write(FULL_LIST_PATH, full_content).await?;
-
-    // Build filtered list with per-provider limits
-    let mut provider_counts = HashMap::new();
-    let max_per_provider = 50;
-
-    let filtered_content = entries
-        .iter()
-        .filter(|(_, _, provider)| {
-            let count = provider_counts.entry(provider.clone()).or_insert(0);
-            if *count < max_per_provider {
-                *count += 1;
-                true
-            } else {
-                false
-            }
-        })
-        .take(600)
-        .map(|(line, _, _)| line.as_str())
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    tokio::fs::write(PROXYLIST_PATH, filtered_content).await?;
+    save_speed_lists(&speed_entries).await?;
 
     println!(
-        "[{}] Processing completed.",
-        Local::now().format("%H:%M:%S")
-    );
-    println!(
-        "Full list: {} entries. Filtered list: {} entries.",
-        entries.len(),
-        provider_counts.values().sum::<i32>()
+        "[{}] Total: {}, speed: {}",
+        Local::now().format("%H:%M:%S"),
+        results.len(),
+        speed_entries.len()
     );
 
-    Ok(entries.len())
+    Ok(())
 }
 
+pub async fn save_ping_results(urls: &[NodeOutput]) -> Result<()> {
+    let file = File::create(PING_RESULT_PATH).await?;
+    let mut writer = BufWriter::new(file);
 
-pub async fn save_ping_results(nodes: Vec<String>) -> io::Result<usize> {
-    if nodes.is_empty() {
-        return Ok(0);
+    for node in urls {
+        writer.write_all(node.url.as_bytes()).await?;
+        writer.write_all(b"\n").await?;
+    }
+    writer.flush().await?;
+
+    println!("[{}] Ping results saved", Local::now().format("%H:%M:%S"));
+
+    Ok(())
+}
+
+async fn save_speed_lists(entries: &[ProcessedNode<'_>]) -> io::Result<()> {
+    {
+        let file = File::create(SPEED_RESULT_PATH).await?;
+        let mut writer = BufWriter::new(file);
+
+        for entry in entries {
+            writer.write_all(entry.url.as_bytes()).await?;
+            writer.write_all(b"\n").await?;
+        }
+        writer.flush().await?;
     }
 
-    // Ensure output directory exists
-    let _ = tokio::fs::create_dir_all("assets").await;
+    {
+        let file = File::create(NON_RU_LIST_PATH).await?;
+        let mut writer = BufWriter::new(file);
 
-    let count = nodes.len();
-    let content = nodes.join("\n");
+        for entry in entries.iter().filter(|e| e.iso_code != "RU") {
+            writer.write_all(entry.url.as_bytes()).await?;
+            writer.write_all(b"\n").await?;
+        }
+        writer.flush().await?;
+    }
 
-    tokio::fs::write(PING_RESULT_PATH, content).await?;
+    println!("[{}] Speed results saved", Local::now().format("%H:%M:%S"));
 
-    println!(
-        "[{}] Ping results saved: {} entries -> {}",
-        Local::now().format("%H:%M:%S"),
-        count,
-        PING_RESULT_PATH
-    );
-
-    Ok(count)
+    Ok(())
 }
 
+pub fn process_speed_node<'a>(
+    raw_url: &str,
+    speed: u64,
+    ip: IpAddr,
+    country_reader: &'a Reader<Vec<u8>>,
+    asn_reader: &'a Reader<Vec<u8>>,
+) -> (String, &'a str) {
+    let (base_url, fragment) = raw_url.split_once('#').unwrap_or((raw_url, ""));
+
+    let country_iso = country_reader
+        .lookup(ip)
+        .ok()
+        .and_then(|res| res.decode_path::<&str>(&path!["country", "iso_code"]).ok())
+        .flatten();
+
+    let provider = asn_reader
+        .lookup(ip)
+        .ok()
+        .and_then(|res| {
+            res.decode_path::<&str>(&path!["autonomous_system_organization"])
+                .ok()
+        })
+        .flatten()
+        .map(clean_provider_name);
+
+    let (formatted_line, returned_iso) = if let (Some(iso), Some(prov)) = (country_iso, provider) {
+        let flag = get_flag_emoji(iso);
+        (format!("{base_url}#{flag}{speed}Mb | {prov}"), iso)
+    } else {
+        let line = {
+            let decoded = urlencoding::decode(fragment).unwrap_or_default();
+            let trimmed = decoded.trim();
+
+            if trimmed.is_empty() {
+                format!("{base_url}#🌐{speed}Mb")
+            } else {
+                let short_name: String = trimmed.chars().take(30).collect();
+                format!("{base_url}#🌐{speed}Mb | {short_name}")
+            }
+        };
+        (line, "XX")
+    };
+
+    (formatted_line, returned_iso)
+}
 
 fn clean_provider_name(raw_name: &str) -> String {
-    let lower = raw_name.to_lowercase();
+    let words = ["LLC", "Inc", "Ltd", "PJSC", "Corporation"];
 
-    // Known provider mappings
-    let known = [
-        ("digitalocean", "DigitalOcean"),
-        ("amazon", "AWS"),
-        ("aws", "AWS"),
-        ("google", "Google Cloud"),
-        ("microsoft", "Azure"),
-        ("hetzner", "Hetzner"),
-        ("ovh", "OVH"),
-        ("linode", "Linode"),
-        ("vultr", "Vultr"),
-        ("oracle", "Oracle Cloud"),
-    ];
-
-    for (key, val) in known {
-        if lower.contains(key) {
-            return val.to_string();
-        }
-    }
-
-    // Remove common company suffixes and symbols
     raw_name
-        .replace(['.', ',', '(', ')'], "")
-        .replace("LLC", "")
-        .replace("Inc", "")
-        .replace("Ltd", "")
-        .replace("PJSC", "")
-        .replace("Corporation", "")
-        .trim()
-        .to_string()
+        .chars()
+        .filter(|&c| c != '.')
+        .collect::<String>()
+        .split_whitespace()
+        .filter(|word| !words.contains(word))
+        .collect::<Vec<&str>>()
+        .join(" ")
 }
 
-
 fn get_flag_emoji(code: &str) -> String {
-    code.to_uppercase()
-        .chars()
-        .filter_map(|c| std::char::from_u32(c as u32 + 0x1F1E6 - 65))
+    code.chars()
+        .filter_map(|c| {
+            let upper = c.to_ascii_uppercase();
+            u32::from(upper)
+                .checked_add(0x1F1E6 - 65)
+                .and_then(char::from_u32)
+        })
         .collect()
 }
