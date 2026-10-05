@@ -1,37 +1,68 @@
-use tokio::process::Child;
+use hickory_resolver::{
+    Resolver,
+    config::{CLOUDFLARE, ResolverConfig},
+    net::runtime::TokioRuntimeProvider,
+};
+use reqwest::Client;
+use std::{net::IpAddr, sync::LazyLock, time::Duration};
 
-pub const TCP_MAX_CONCURRENT: usize = 100;
-pub const PING_MAX_CONCURRENT: usize = 140;
-pub const SPEED_TEST_THREADS: usize = 30;
+pub const BASE_PORT: u16 = 28_000;
+pub const MAX_WORKERS: usize = 150;
+pub const MAX_SPEED_WORKERS: usize = 15;
 
-pub const TCP_CHECK_TIMEOUT_MS: u64 = 2000;
-pub const MIN_SPEED_THRESHOLD: f64 = 56.0;
+pub const HARVEST_INTERVAL: Duration = Duration::from_hours(3);
+pub const TCP_CHECK_TIMEOUT: Duration = Duration::from_secs(2);
+pub const IP_CHECK_TIMEOUT: Duration = Duration::from_secs(4);
+pub const SPEED_CHECK_TIMEOUT: Duration = Duration::from_secs(4);
 
-pub const TEST_URL_204: &str = "https://www.google.com/generate_204";
-pub const SPEED_TEST_URL: &str = "https://cachefly.cachefly.net/50mb.test";
+pub const SPEED_TEST_URL: &str = "https://cachefly.cachefly.net/100mb.test";
+pub const XRAY_PATH: &str = "bin/xray";
+pub const NODES_PATH: &str = "core/nodes.txt";
 
-pub const XRAY_EXE: &str = "bin/xray.exe";
-pub const NODES_SOURCE: &str = "core/nodes.txt";
 pub const ASN_DB_PATH: &str = "core/GeoLite2-ASN.mmdb";
-pub const CITY_DB_PATH: &str = "core/GeoLite2-City.mmdb";
 pub const COUNTRY_DB_PATH: &str = "core/GeoLite2-Country.mmdb";
 
-pub struct XrayGuard { 
-    pub child: Child 
+pub const PING_RESULT_PATH: &str = "assets/ping_tested.txt";
+pub const SPEED_RESULT_PATH: &str = "assets/speed_tested.txt";
+pub const NON_RU_PATH: &str = "assets/non_ru.txt";
+
+pub struct NodeOutput {
+    pub url: String,
+    pub result: TestResult,
 }
 
-impl Drop for XrayGuard { 
-    fn drop(&mut self) { let _ = self.child.start_kill(); } 
+pub enum TestResult {
+    Ping,
+    Speed { speed: u64, ip: IpAddr },
 }
 
-#[derive(Debug, Clone)]
-pub struct TestResult {
-    pub raw_url: String,
-    pub speed: f64,
-    pub ip: String,
-}
+pub static DNS_RESOLVER: LazyLock<Resolver<TokioRuntimeProvider>> = LazyLock::new(|| {
+    let config = ResolverConfig::udp_and_tcp(&CLOUDFLARE);
+    Resolver::builder_with_config(config, TokioRuntimeProvider::default())
+        .build()
+        .unwrap_or_else(|err| {
+            eprintln!("failed to create dns resolver: {err}");
+            std::process::exit(1);
+        })
+});
 
-pub enum TestOutput {
-    PingSuccess,
-    Full(f64, String),
-}
+pub static CLIENT: LazyLock<Client> = LazyLock::new(|| {
+    const TIMEOUT: Duration = Duration::from_secs(20);
+    const CONNECT_TIMEOUT: Duration = Duration::from_secs(7);
+
+    let init = || -> Result<Client, reqwest::Error> {
+
+        Client::builder()
+            .timeout(TIMEOUT)
+            .connect_timeout(CONNECT_TIMEOUT)
+            .build()
+    };
+
+    match init() {
+        Ok(client) => client,
+        Err(err) => {
+            eprintln!("failed to initialize HTTP client: {err}");
+            std::process::exit(1);
+        }
+    }
+});
