@@ -1,7 +1,7 @@
 mixed-port: 33333
-
 bind-address: "127.0.0.1"
 allow-lan: false
+
 mode: rule
 log-level: info
 ipv6: false
@@ -31,6 +31,7 @@ dns:
   default-nameserver:
     - 8.8.8.8
     - 1.1.1.1
+    - 83.217.211.149 # zapret
     - 111.88.96.50 # xbox
     - 45.155.204.190 # geohide
   enhanced-mode: fake-ip
@@ -41,13 +42,14 @@ dns:
     - MATCH,fake-ip
   nameserver-policy:
     'geosite:google-deepmind,openai,spotify,twitch,anthropic':
-      #- https://xbox-dns.ru/dns-query
+      - https://dns.zapret.moe/dns-query
       #- https://dns.comss.one/dns-query
-      - https://dns.geohide.ru:444/dns-query
+      #- https://dns.geohide.ru:444/dns-query
   nameserver:
+    - https://dns.google/dns-query
+    - https://dns.zapret.moe/dns-query
     - https://xbox-dns.ru/dns-query
     - https://dns.geohide.ru:444/dns-query
-    - https://dns.google/dns-query
 
 sniffer:
   enable: true
@@ -97,13 +99,13 @@ proxy-providers:
     <<: *health_check
   igareck-wl:
     type: http
-    url: "https://translate.yandex.ru/translate?url=https://bitbucket.org/igareck/vpn-configs-for-russia/raw/main/WHITE-CIDR-RU-all.txt&lang=de-de"
+    url: "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/WHITE-CIDR-RU-all.txt"
     path: ./providers/igareck-wl.yaml
     interval: 1800
     <<: *health_check
   zieng-wl:
     type: http
-    url: "https://hub.mos.ru/zieng2/wl/raw/main/list_universal.txt"
+    url: "https://raw.githubusercontent.com/zieng2/wl/refs/heads/main/vless_universal.txt"
     path: ./providers/zieng-wl.yaml
     interval: 1800
     <<: *health_check
