@@ -30,10 +30,7 @@ dns:
   ipv6: false
   default-nameserver:
     - 8.8.8.8
-    - 1.1.1.1
-    - 83.217.211.149 # zapret
-    - 111.88.96.50 # xbox
-    - 45.155.204.190 # geohide
+    - 9.9.9.9
   enhanced-mode: fake-ip
   fake-ip-range: 198.18.0.1/16
   fake-ip-filter-mode: rule
@@ -42,14 +39,13 @@ dns:
     - MATCH,fake-ip
   nameserver-policy:
     'geosite:google-deepmind,openai,spotify,twitch,anthropic':
-      - https://dns.zapret.moe/dns-query
-      #- https://dns.comss.one/dns-query
-      #- https://dns.geohide.ru:444/dns-query
+      #- https://dns.zapret.moe/dns-query
+      - https://geohide.ru/dns-query
+      - https://eu.geohide.ru/dns-query
   nameserver:
+    - https://geohide.ru/dns-query
     - https://dns.google/dns-query
-    - https://dns.zapret.moe/dns-query
-    - https://xbox-dns.ru/dns-query
-    - https://dns.geohide.ru:444/dns-query
+    - https://dns.quad9.net/dns-query
 
 sniffer:
   enable: true
