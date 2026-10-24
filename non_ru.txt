@@ -1,9 +1,5 @@
-vless://495c7195-85b8-498a-bf20-2ea9ce9175b5@172.64.152.10:443?security=tls&type=ws&host=snip.edgeoneai.cc.cd&path=%2Ffdip%3Dsstp%3A%2F%2Fvpn%3Avpn%40public-vpn-200.opengw.net%3A443&sni=snip.edgeoneai.cc.cd&fp=chrome#🇸🇪140Mb | Cloudflare
-vless://50414e45-4c5f-5a45-5553-7bac159e3b40@172.67.145.14:443?security=tls&sni=web-app-ji3j1z.app-wuuhuw.workers.dev&fp=chrome&type=ws&host=web-app-ji3j1z.app-wuuhuw.workers.dev&path=%2Fapi%2Fws#🇸🇪107Mb | Cloudflare
-vless://495c7195-85b8-498a-bf20-2ea9ce9175b5@172.64.150.28:443?path=%2F&security=tls&alpn=h3%2Ch2&host=snip.edgeoneai.cc.cd&fp=chrome&type=ws&sni=snip.edgeoneai.cc.cd#🇸🇪77Mb | Cloudflare
-vless://495c7195-85b8-498a-bf20-2ea9ce9175b5@193.36.95.34:443?path=%2F%3FTELEGRAM--MARAMBASHI--MARAMBASHI--MARAMBASHI--MARAMBASHI%3Fed%3D2560&security=tls&host=snip.edgeoneai.cc.cd&type=ws&sni=snip.edgeoneai.cc.cd#🇰🇬55Mb | Cloudflare
-vless://5a96c1fc-f167-44b9-9020-8f6867537d14@finland03.azotvpn.xyz:9443?type=xhttp&security=tls&fp=firefox&sni=finland03.azotvpn.xyz&mode=auto#🇫🇮54Mb | Senko Digital
-vless://495c7195-85b8-498a-bf20-2ea9ce9175b5@213.165.37.102:443?security=tls&fp=chrome&sni=snip.edgeoneai.cc.cd&type=ws&host=snip.edgeoneai.cc.cd&path=%2F#🇩🇪54Mb | Cloudflare
-vless://caf3d607-95c9-4ea0-98b5-864027056ba0@96.44.152.10:443?flow=xtls-rprx-vision&fp=firefox&pbk=1TtWNQhTJr_3H7-ypMw4EiLzVxy22AzUtMiE5JmQMl4&security=reality&sid=1c5869a95671bcb0&sni=ca1.accessboy.com&type=raw#🇨🇦54Mb | BrainStorm Network
-vless://495c7195-85b8-498a-bf20-2ea9ce9175b5@31.76.96.60:443?security=tls&type=ws&path=%2Ffdip%3Dsstp%3A%2F%2Fvpn%3Avpn%40public-vpn-200.opengw.net%3A443fp%3Dchrome&host=snip.edgeoneai.cc.cd&packetEncoding=xudp&sni=snip.edgeoneai.cc.cd&fp=chrome#🇩🇪53Mb | Cloudflare
-vless://065faef7-2449-4d29-895b-ce3a696ab7a2@netherlands01.azotvpn.xyz:9443?type=xhttp&security=tls&fp=firefox&sni=netherlands01.azotvpn.xyz&mode=auto#🇳🇱52Mb | Senko Digital
+vless://d884354e-17ce-4843-b174-36bca3c1ccc6@www.visa.com.hk:443?security=tls&sni=nl-ams.862400.xyz&fp=random&type=ws&host=nl-ams.862400.xyz&path=%2Fannouncement%3Fed%3D2048#🇳🇱73Mb | Akamai Connected Cloud
+vless://2f5cfa10-43e5-4912-800d-557308a26a29@185.119.81.7:10443?flow=xtls-rprx-vision&type=raw&security=tls&fp=chrome#🇫🇮67Mb | DigitalEra Tech OU
+vless://924e20da-fcad-4e7e-8113-c62d27a0d01e@hw3.divarkhaghazi.com:465?security=tls&fp=chrome&alpn=http%2F1.1&sni=hw3.divarkhaghazi.com.&type=ws&host=hw3.divarkhaghazi.com.&path=%2F#🇫🇮63Mb | Hetzner Online GmbH
+vless://495c7195-85b8-498a-bf20-2ea9ce9175b5@155.103.70.33:443?fp=firefox&host=snip.edgeoneai.cc.cd&security=tls&sni=snip.edgeoneai.cc.cd&type=ws#🇧🇬53Mb | Cloudflare
+vless://0b6a937e-5b0e-49ca-b31e-f03f290e97cf@103.91.147.218:443?flow=xtls-rprx-vision&fp=firefox&pbk=SbVKOEMjK0sIlbwg4akyBg5mL5KZwwB-ed4eEE7YnRc&security=reality&sni=ai.ozon.ru&type=raw#🇫🇷50Mb | OVH SAS
