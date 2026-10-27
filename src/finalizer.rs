@@ -1,7 +1,6 @@
 use crate::TestResult;
 use crate::config::{
-    ASN_DB_PATH, COUNTRY_DB_PATH, NON_RU_PATH as NON_RU_LIST_PATH, NodeOutput, PING_RESULT_PATH,
-    SPEED_RESULT_PATH,
+    ASN_DB_PATH, COUNTRY_DB_PATH, NON_RU_PATH, NodeOutput, PING_RESULT_PATH, SPEED_RESULT_PATH,
 };
 use anyhow::{Result, bail};
 use chrono::Local;
@@ -11,7 +10,7 @@ use std::net::IpAddr;
 use tokio::fs::File;
 use tokio::io::{AsyncWriteExt as _, BufWriter};
 
-pub struct ProcessedNode<'a> {
+struct ProcessedNode<'a> {
     pub url: String,
     pub speed: u64,
     pub iso_code: &'a str,
@@ -88,7 +87,7 @@ async fn save_speed_lists(entries: &[ProcessedNode<'_>]) -> io::Result<()> {
     }
 
     {
-        let file = File::create(NON_RU_LIST_PATH).await?;
+        let file = File::create(NON_RU_PATH).await?;
         let mut writer = BufWriter::new(file);
 
         for entry in entries.iter().filter(|e| e.iso_code != "RU") {
@@ -150,11 +149,11 @@ pub fn process_speed_node<'a>(
 }
 
 fn clean_provider_name(raw_name: &str) -> String {
-    let words = ["LLC", "Inc", "Ltd", "PJSC", "Corporation"];
+    let words = ["LLC", "Inc", "Ltd", "LTD",  "PJSC", "Corporation"];
 
     raw_name
         .chars()
-        .filter(|&c| c != '.')
+        .filter(|&c| c != '.' && c != ',')
         .collect::<String>()
         .split_whitespace()
         .filter(|word| !words.contains(word))
