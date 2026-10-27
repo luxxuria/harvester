@@ -1,14 +1,22 @@
 use crate::config::{
-    ASN_DB_PATH, CLIENT, COUNTRY_DB_PATH, HARVEST_INTERVAL, NODES_PATH, SPEED_RESULT_PATH, XRAY_PATH,
+    ASN_DB_PATH, CLIENT, COUNTRY_DB_PATH, HARVEST_INTERVAL, NODES_PATH,
+    SPEED_RESULT_PATH, XRAY_PATH,
 };
 use anyhow::{Context as _, Result, bail};
+use hickory_resolver::{
+    TokioResolver,
+    config::{
+        LookupIpStrategy, NameServerConfig, ResolveHosts, ResolverConfig, ResolverOpts,
+        ServerOrderingStrategy,
+    },
+    net::runtime::TokioRuntimeProvider,
+};
 use std::{
-    net::{Ipv4Addr, SocketAddr},
+    net::{IpAddr, Ipv4Addr, SocketAddr},
     path::Path,
     time::Duration,
 };
 use tokio::time::{sleep, timeout};
-use url::Url;
 
 pub fn check_environment() -> Result<()> {
     if let Err(err) = std::fs::create_dir_all("assets") {
@@ -102,15 +110,65 @@ pub fn time_until_stale() -> Option<Duration> {
     HARVEST_INTERVAL.checked_sub(elapsed)
 }
 
-pub fn get_host_port(parsed: &Url) -> Option<(&str, u16)> {
-    let host = parsed.host_str()?;
-    let port = parsed.port()?;
-    Some((host, port))
+pub fn build_resolver() -> Result<TokioResolver> {
+    let mut opts = ResolverOpts::default();
+
+    opts.timeout = Duration::from_secs(2);
+    opts.attempts = 1;
+    opts.ip_strategy = LookupIpStrategy::Ipv4Only;
+    opts.cache_size = 16 * 1024;
+    opts.use_hosts_file = ResolveHosts::Never;
+    opts.num_concurrent_reqs = 2;
+    opts.max_active_requests = 256;
+    opts.edns0 = true;
+    opts.server_ordering_strategy = ServerOrderingStrategy::RoundRobin;
+
+    let dns_ips: [IpAddr; 4] = [
+        IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1)),
+        IpAddr::V4(Ipv4Addr::new(9, 9, 9, 10)),
+        IpAddr::V4(Ipv4Addr::new(64, 6, 64, 6)),
+        IpAddr::V4(Ipv4Addr::new(76, 76, 2, 0)),
+    ];
+
+    let name_servers: Vec<NameServerConfig> = dns_ips
+        .into_iter()
+        .map(NameServerConfig::tcp)
+        .collect();
+
+    let config = ResolverConfig::from_parts(None, vec![], name_servers);
+
+    let builder = TokioResolver::builder_with_config(config, TokioRuntimeProvider::default());
+
+    builder
+        .with_options(opts)
+        .build()
+        .context("resolver creation error")
+}
+
+pub async fn resolve_host(domain: &str, resolver: &TokioResolver) -> Result<IpAddr> {
+    if let Ok(ip) = domain.parse::<IpAddr>() {
+        return Ok(ip);
+    }
+
+    let lookup = resolver.ipv4_lookup(domain).await;
+
+    let lookup = match lookup {
+        Ok(l) => l,
+        Err(err) if err.is_nx_domain() => anyhow::bail!("NXDomain"),
+        Err(err) if err.is_no_records_found() => anyhow::bail!("no ipv4 records"),
+        Err(err) => return Err(err.into()),
+    };
+
+    lookup
+        .answers()
+        .iter()
+        .find_map(|record| record.data.ip_addr())
+        .context("no ipv4 resolved")
 }
 
 pub async fn wait_port(port: u16) -> bool {
     let max_wait = Duration::from_secs(3);
-    let check_interval = Duration::from_millis(100);
+    let check_interval = Duration::from_millis(50);
     let addr = SocketAddr::from((Ipv4Addr::LOCALHOST, port));
     timeout(max_wait, async {
         loop {
