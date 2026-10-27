@@ -5,11 +5,12 @@ use anyhow::{Context as _, Result};
 use chrono::Local;
 use crossbeam_queue::ArrayQueue;
 use futures_util::{StreamExt as _, stream};
-use std::env;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use std::time::Duration;
+use std::{env, sync::atomic::AtomicUsize};
 use tokio::sync::Semaphore;
-use tokio::time::Instant;
+use tokio::time::{Instant, sleep};
 
 mod config;
 mod config_builder;
@@ -18,8 +19,11 @@ mod stages;
 mod utils;
 mod vless_collector;
 
+use crate::config::MAX_FUTURES;
 use crate::{
-    config::{BASE_PORT, MAX_SPEED_WORKERS, MAX_WORKERS, NodeOutput, TestResult},
+    config::{
+        BASE_PORT, MAX_PING_WORKERS, MAX_SPEED_WORKERS, MAX_TCP_WORKERS, NodeOutput, TestResult,
+    },
     stages::test_proxy,
 };
 use config::NODES_PATH;
@@ -59,7 +63,7 @@ async fn run_scheduler() -> Result<()> {
                 time_to_harvest.as_secs() / 3600,
                 (time_to_harvest.as_secs() % 3600) / 60
             );
-            tokio::time::sleep(time_to_harvest).await;
+            sleep(time_to_harvest).await;
         }
 
         let start = Instant::now();
@@ -78,7 +82,7 @@ async fn run_scheduler() -> Result<()> {
                     "[{}] Update failed after {duration:.2?}: {err:#}",
                     Local::now().format("%H:%M:%S")
                 );
-                tokio::time::sleep(Duration::from_secs(300)).await;
+                sleep(Duration::from_secs(300)).await;
             }
         }
     }
@@ -88,29 +92,46 @@ async fn run_full_harvest() -> Result<()> {
     println!("[{}] Starting harvest...", Local::now().format("%H:%M:%S"));
 
     let raw_urls = vless_collector::fetch_nodes(NODES_PATH).await?;
+    let processed = Arc::new(AtomicUsize::new(0));
+
+    let ports_array = Arc::new(ArrayQueue::new(MAX_FUTURES));
+
+    let tcp_semaphore = Arc::new(Semaphore::new(MAX_TCP_WORKERS));
+    let ping_semaphore = Arc::new(Semaphore::new(MAX_PING_WORKERS));
     let speed_semaphore = Arc::new(Semaphore::new(MAX_SPEED_WORKERS));
-    let ports_array = Arc::new(ArrayQueue::new(MAX_WORKERS));
 
     #[allow(clippy::cast_possible_truncation, clippy::as_conversions)]
-    for port in BASE_PORT..BASE_PORT + MAX_WORKERS as u16 {
+    for port in BASE_PORT..BASE_PORT + MAX_FUTURES as u16 {
         let _unused = ports_array.push(port);
     }
 
     let results: Vec<NodeOutput> = stream::iter(raw_urls)
-        .map(|url| {
-            let speed_sem = Arc::clone(&speed_semaphore);
+        .map(|vless_node| {
             let ports = Arc::clone(&ports_array);
+            let count = Arc::clone(&processed);
+            let tcp_sem = Arc::clone(&tcp_semaphore);
+            let ping_sem = Arc::clone(&ping_semaphore);
+            let speed_sem = Arc::clone(&speed_semaphore);
             async move {
                 let port = ports.pop().context("impossible error").ok()?;
-                let result = test_proxy(&url, speed_sem, port).await;
+                let result = test_proxy(&vless_node, tcp_sem, ping_sem, speed_sem, port).await;
                 ports.push(port).ok()?;
+
+                let count = count.fetch_add(1, Ordering::Relaxed) + 1;
+                if count.is_multiple_of(5000) {
+                    println!("[{}] processed: {count}", Local::now().format("%H:%M:%S"));
+                }
+
                 let Ok(result) = result else {
                     return None;
                 };
-                Some(NodeOutput { url, result })
+                Some(NodeOutput {
+                    url: vless_node.url,
+                    result,
+                })
             }
         })
-        .buffer_unordered(MAX_WORKERS)
+        .buffer_unordered(MAX_FUTURES)
         .filter_map(std::future::ready)
         .collect()
         .await;
