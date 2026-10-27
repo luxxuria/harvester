@@ -1,26 +1,31 @@
 use serde_json::{Value, json};
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::net::IpAddr;
 use url::Url;
 
-pub fn create_config_from_url(url: &Url, xray_port: u16) -> Option<Value> {
+pub fn create_config_from_url(url: &Url, xray_port: u16, host_ip: IpAddr) -> Option<Value> {
     let uuid = url.username();
     let host = url.host_str()?;
+    let host_ip = host_ip.to_string();
     let port = url.port()?;
     let params: HashMap<String, String> = url.query_pairs().into_owned().collect();
 
-    Some(assemble_vless_config(uuid, host, port, xray_port, &params))
+    Some(assemble_vless_config(
+        uuid, host, &host_ip, port, xray_port, &params,
+    ))
 }
 
 fn assemble_vless_config(
     uuid: &str,
     host: &str,
+    host_ip: &str,
     port: u16,
     xray_port: u16,
     params: &HashMap<String, String>,
 ) -> Value {
+    let outbound_settings = build_vless_outbound_settings(host_ip, port, uuid, params);
     let stream_settings = build_stream_settings(host, params);
-    let outbound_settings = build_vless_outbound_settings(host, port, uuid, params);
 
     json!({
         "log": { "loglevel": "none" },
@@ -113,7 +118,6 @@ fn build_stream_settings(host: &str, params: &HashMap<String, String>) -> Value 
             "tcpNoDelay": true,
             "reuseAddr": true,
             "tcpKeepAliveInterval": 5,
-            "receiveBufferSize": 524_288
         }
     });
 
@@ -155,6 +159,28 @@ fn build_stream_settings(host: &str, params: &HashMap<String, String>) -> Value 
                     "host": xhttp_host,
                     "path": path_ref,
                     "mode": mode
+                }),
+            );
+        } else if network == "grpc" {
+            let authority = params.get("authority").map_or("", String::as_str);
+            let service_name = params.get("serviceName").map_or("", String::as_str);
+
+            let _unused = obj.insert(
+                "grpcSettings".to_string(),
+                json!({
+                    "authority": authority,
+                    "serviceName": service_name,
+                    "multiMode": params.get("mode").is_some_and(|m| m == "multi")
+                }),
+            );
+        } else if network == "ws" {
+            let ws_host = params.get("host").map_or(host, String::as_str);
+
+            let _unused = obj.insert(
+                "wsSettings".to_string(),
+                json!({
+                    "path": path_ref,
+                    "host": ws_host
                 }),
             );
         }
