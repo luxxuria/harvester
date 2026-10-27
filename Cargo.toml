@@ -1,10 +1,11 @@
 [package]
 name = "harvester"
-version = "2.0.0"
+version = "2.1.0"
 edition = "2024"
 
 [dependencies]
 anyhow = "1.0.104"
+bytes = "1.12.1"
 chrono = { version = "0.4", features = ["clock"] }
 crossbeam-queue = "0.3.14"
 crossterm = "0.29.0"
