@@ -14,8 +14,8 @@ geo-update-interval: 24
 geox-url:
   geosite: "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geosite.dat"
 
-secret: mihomo
-external-ui: ui # --> http://127.0.0.1:33332/ui/#/setup?hostname=127.0.0.1&port=33332&secret=mihomo <--
+secret: mihomoverysecret
+external-ui: ui # --> http://127.0.0.1:33332/ui/#/setup?hostname=127.0.0.1&port=33332&secret=mihomoverysecret <--
 external-ui-url: https://github.com/MetaCubeX/metacubexd/releases/latest/download/compressed-dist.tgz
 external-controller: 127.0.0.1:33332
 
