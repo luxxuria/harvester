@@ -29,6 +29,7 @@ dns:
   listen: 0.0.0.0:1053
   ipv6: false
   default-nameserver:
+    - 1.1.1.1
     - 8.8.8.8
     - 9.9.9.9
   enhanced-mode: fake-ip
@@ -38,12 +39,12 @@ dns:
     - GEOSITE,private,real-ip
     - MATCH,fake-ip
   nameserver-policy:
-    'geosite:google-deepmind,openai,spotify,twitch,anthropic':
-      #- https://dns.zapret.moe/dns-query
-      - https://geohide.ru/dns-query
-      - https://eu.geohide.ru/dns-query
+    'geosite:openai,spotify,twitch,anthropic':
+      - https://dns.malw.link/dns-query
+    'geosite:google-deepmind':
+      - https://dns.malw.link/dns-query
   nameserver:
-    - https://geohide.ru/dns-query
+    - https://1.1.1.1/dns-query
     - https://dns.google/dns-query
     - https://dns.quad9.net/dns-query
 
@@ -66,97 +67,91 @@ anchors:
       url: https://connectivitycheck.gstatic.com/generate_204
       interval: 60
       timeout: 3000
-      lazy: true
+      lazy: false
   url_test: &url_test
     type: url-test
     url: https://connectivitycheck.gstatic.com/generate_204
     interval: 60
     timeout: 3000
-    lazy: true
+    lazy: false
     max-failed-times: 3
     tolerance: 50
   ip:        &ip        {type: http, interval: 86400, behavior: ipcidr,    format: mrs}
   domain:    &domain    {type: http, interval: 86400, behavior: domain,    format: mrs}
   classical: &classical {type: http, interval: 86400, behavior: classical, format: yaml}
 
-
 proxy-providers:
   warp_provider:
     type: http
-    url: https://fastly.jsdelivr.net/gh/luxxuria/harvester@main/warp-endpoints.list
-    path: ./providers/warp-endpoints.yaml
+    url: https://cdn.falkonne.netcraze.link/mihomo-25-proxies.yaml
+    path: ./providers/warp.yaml
     interval: 72000
     <<: *health_check
-  speed_tested:
+  non_ru_provider:
     type: http
-    url: "https://cdn.jsdelivr.net/gh/luxxuria/harvester@main/speed_tested.txt"
-    path: ./providers/speed_tested.yaml
+    url: https://raw.githubusercontent.com/luxxuria/harvester/refs/heads/main/non_ru.txt
     interval: 3600
+    path: ./providers/non_ru.yaml
     <<: *health_check
-  igareck-wl:
+  non_ru_provider-auto:
     type: http
-    url: "https://raw.githubusercontent.com/igareck/vpn-configs-for-russia/refs/heads/main/WHITE-CIDR-RU-all.txt"
-    path: ./providers/igareck-wl.yaml
-    interval: 1800
+    url: https://raw.githubusercontent.com/luxxuria/harvester/refs/heads/main/non_ru.txt
+    interval: 3600
+    path: ./providers/non_ru-auto.yaml
     <<: *health_check
-  zieng-wl:
-    type: http
-    url: "https://raw.githubusercontent.com/zieng2/wl/refs/heads/main/vless_universal.txt"
-    path: ./providers/zieng-wl.yaml
-    interval: 1800
-    <<: *health_check
-
 
 proxy-groups:
   - name: PROXY
     type: select
     proxies:
-      - warp-auto
-      - warp-select
-      - custom
-      - igareck
-      - zieng
-  - name: warp-auto
+      - warp
+      - non_ru-select
+      - non_ru-auto
+  - name: warp
     <<: *url_test
     use:
       - warp_provider
-  - name: warp-select
+  - name: non_ru-select
     type: select
     use:
-      - warp_provider
-  - name: custom
-    type: select
+      - non_ru_provider
+  - name: non_ru-auto
+    <<: *url_test
     use:
-      - speed_tested
-  - name: igareck
-    type: select
-    use:
-      - igareck-wl
-  - name: zieng
-    type: select
-    use:
-      - zieng-wl
-
+      - non_ru_provider-auto
 
 rules:
-  - RULE-SET,private-ips,DIRECT,no-resolve
-  - GEOSITE,private,DIRECT
-  - IP-CIDR,::/0,REJECT,no-resolve
-  - RULE-SET,oisd_big,REJECT-DROP
-  - GEOSITE,category-ads-all,REJECT-DROP
-  - GEOSITE,category-ru,DIRECT
-  - RULE-SET,whitelist,DIRECT
-  - RULE-SET,wld,DIRECT
-  - RULE-SET,wldc,DIRECT
-  - GEOSITE,youtube,PROXY
-  - GEOSITE,google,DIRECT
-  - GEOSITE,openai,DIRECT
-  - GEOSITE,anthropic,DIRECT
-  - GEOSITE,spotify,DIRECT
-  - GEOSITE,twitch,DIRECT
-  - GEOSITE,pinterest,DIRECT
+  - SUB-RULE,(NOT,((DOMAIN,private))),private
+  - SUB-RULE,(NOT,((DOMAIN,reject))),reject
+  - SUB-RULE,(NOT,((DOMAIN,russia))),russia
+  - SUB-RULE,(NOT,((DOMAIN,non-ru))),non-ru
+  - SUB-RULE,(NOT,((DOMAIN,direct))),direct
   - MATCH,PROXY
 
+sub-rules:
+  private:
+    - RULE-SET,private-ips,DIRECT,no-resolve
+    - GEOSITE,private,DIRECT
+  reject:
+    - IP-CIDR,::/0,REJECT,no-resolve
+    - RULE-SET,oisd_big,REJECT-DROP
+    - GEOSITE,category-ads-all,REJECT-DROP
+  russia:
+    - GEOSITE,category-ru,DIRECT
+    - RULE-SET,whitelist,DIRECT
+    - RULE-SET,wld,DIRECT
+    - RULE-SET,wldc,DIRECT
+  non-ru:
+    - DOMAIN-SUFFIX,openrouter.ai,non_ru-auto
+    - GEOSITE,tiktok,non_ru-auto
+    - GEOSITE,youtube,warp
+    - GEOSITE,google-deepmind,warp
+    - GEOSITE,spotify,warp
+  direct:
+    - GEOSITE,google,DIRECT
+    - GEOSITE,twitch,DIRECT
+    - GEOSITE,pinterest,DIRECT
+    - GEOSITE,reddit,DIRECT
 
 rule-providers:
   oisd_big:
