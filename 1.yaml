@@ -83,7 +83,7 @@ anchors:
 proxy-providers:
   warp_provider:
     type: http
-    url: https://cdn.falkonne.netcraze.link/mihomo-25-proxies.yaml
+    url: https://raw.githubusercontent.com/luxxuria/harvester/refs/heads/main/warp-endpoints.list
     path: ./providers/warp.yaml
     interval: 72000
     <<: *health_check
