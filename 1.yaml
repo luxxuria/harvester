@@ -1,7 +1,4 @@
-mixed-port: 33333
-bind-address: "127.0.0.1"
-allow-lan: false
-
+mixed-port: 10707
 mode: rule
 log-level: info
 ipv6: false
@@ -14,10 +11,17 @@ geo-update-interval: 24
 geox-url:
   geosite: "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geosite.dat"
 
-secret: mihomoverysecret
-external-ui: ui # --> http://127.0.0.1:33332/ui/#/setup?hostname=127.0.0.1&port=33332&secret=mihomoverysecret <--
+secret: mihomo
+external-ui: ui # --> http://127.0.0.1:10706/ui/#/setup?hostname=127.0.0.1&port=10706&secret=mihomo <--
 external-ui-url: https://github.com/MetaCubeX/metacubexd/releases/latest/download/compressed-dist.tgz
-external-controller: 127.0.0.1:33332
+
+bind-address: "0.0.0.0"
+external-controller: 0.0.0.0:10706
+allow-lan: true
+external-controller-cors:
+  allow-private-network: true
+  allow-origins:
+    - '*'
 
 dns:
   enable: true
@@ -39,7 +43,7 @@ dns:
     - GEOSITE,private,real-ip
     - MATCH,fake-ip
   nameserver-policy:
-    'geosite:openai,spotify,twitch,anthropic':
+    'geosite:openai,spotify,twitch,anthropic,xai,tiktok':
       - https://dns.malw.link/dns-query
     'geosite:google-deepmind':
       - https://dns.malw.link/dns-query
@@ -61,6 +65,7 @@ sniffer:
       ports: [443, 8443]
 
 anchors:
+  select: &select {type: select}
   health_check: &health_check
     health-check:
       enable: true
@@ -68,6 +73,7 @@ anchors:
       interval: 60
       timeout: 3000
       lazy: false
+
   url_test: &url_test
     type: url-test
     url: https://connectivitycheck.gstatic.com/generate_204
@@ -76,49 +82,30 @@ anchors:
     lazy: false
     max-failed-times: 3
     tolerance: 50
+
+  http: &http
+    type: http
+    interval: 3600
+    <<: *health_check
+
+  warp-list:   &warp-list   https://raw.githubusercontent.com/luxxuria/harvester/refs/heads/main/warp-endpoints.list
+  non_ru-list: &non_ru-list https://raw.githubusercontent.com/luxxuria/harvester/refs/heads/main/non_ru.txt
+  
   ip:        &ip        {type: http, interval: 86400, behavior: ipcidr,    format: mrs}
   domain:    &domain    {type: http, interval: 86400, behavior: domain,    format: mrs}
   classical: &classical {type: http, interval: 86400, behavior: classical, format: yaml}
 
+
 proxy-providers:
-  warp_provider:
-    type: http
-    url: https://raw.githubusercontent.com/luxxuria/harvester/refs/heads/main/warp-endpoints.list
-    path: ./providers/warp.yaml
-    interval: 72000
-    <<: *health_check
-  non_ru_provider:
-    type: http
-    url: https://raw.githubusercontent.com/luxxuria/harvester/refs/heads/main/non_ru.txt
-    interval: 3600
-    path: ./providers/non_ru.yaml
-    <<: *health_check
-  non_ru_provider-auto:
-    type: http
-    url: https://raw.githubusercontent.com/luxxuria/harvester/refs/heads/main/non_ru.txt
-    interval: 3600
-    path: ./providers/non_ru-auto.yaml
-    <<: *health_check
+  warp_provider:        {<<: *http, url: *warp-list,   path: ./providers/warp.yaml, interval: 86400}
+  non_ru_provider:      {<<: *http, url: *non_ru-list, path: ./providers/non_ru.yaml}
+  non_ru_provider-auto: {<<: *http, url: *non_ru-list, path: ./providers/non_ru-auto.yaml}
 
 proxy-groups:
-  - name: PROXY
-    type: select
-    proxies:
-      - warp
-      - non_ru-select
-      - non_ru-auto
-  - name: warp
-    <<: *url_test
-    use:
-      - warp_provider
-  - name: non_ru-select
-    type: select
-    use:
-      - non_ru_provider
-  - name: non_ru-auto
-    <<: *url_test
-    use:
-      - non_ru_provider-auto
+  - {name: PROXY,         <<: *select,   proxies: [warp, non_ru-select, non_ru-auto]}
+  - {name: warp,          <<: *url_test, use:     [warp_provider]}
+  - {name: non_ru-auto,   <<: *url_test, use:     [non_ru_provider-auto]}
+  - {name: non_ru-select, <<: *select,   use:     [non_ru_provider]}
 
 rules:
   - SUB-RULE,(NOT,((DOMAIN,private))),private
@@ -126,6 +113,7 @@ rules:
   - SUB-RULE,(NOT,((DOMAIN,russia))),russia
   - SUB-RULE,(NOT,((DOMAIN,non-ru))),non-ru
   - SUB-RULE,(NOT,((DOMAIN,direct))),direct
+
   - MATCH,PROXY
 
 sub-rules:
@@ -143,21 +131,26 @@ sub-rules:
     - RULE-SET,wldc,DIRECT
   non-ru:
     - DOMAIN-SUFFIX,openrouter.ai,non_ru-auto
-    - GEOSITE,tiktok,non_ru-auto
-    - GEOSITE,youtube,warp
-    - GEOSITE,google-deepmind,warp
-    - GEOSITE,spotify,warp
+    - GEOSITE,youtube,PROXY
+    - GEOSITE,google-deepmind,PROXY
   direct:
     - GEOSITE,google,DIRECT
-    - GEOSITE,twitch,DIRECT
     - GEOSITE,pinterest,DIRECT
     - GEOSITE,reddit,DIRECT
 
 rule-providers:
+  private-ips:
+    <<: *ip
+    url: "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geoip/private.mrs"
+    path: ./rule-sets/private.mrs
   oisd_big:
     <<: *domain
     url: "https://fastly.jsdelivr.net/gh/legiz-ru/mihomo-rule-sets@main/oisd/big.mrs"
     path: ./rule-sets/oisd_big.mrs
+  whitelist:
+    <<: *domain
+    url: https://fastly.jsdelivr.net/gh/hydraponique/roscomvpn-geosite/release/mihomo/whitelist.mrs
+    path: ./rule-sets/whitelist.mrs
   wld:
     <<: *domain
     url: "https://fastly.jsdelivr.net/gh/legiz-ru/mihomo-rule-sets@main/other/wld.mrs"
@@ -166,11 +159,17 @@ rule-providers:
     <<: *classical
     url: "https://fastly.jsdelivr.net/gh/legiz-ru/mihomo-rule-sets@main/other/wldc.yaml"
     path: ./rule-sets/wldc.yaml
-  private-ips:
-    <<: *ip
-    url: "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geoip/private.mrs"
-    path: ./rule-sets/private.mrs
-  whitelist:
-    <<: *domain
-    url: https://fastly.jsdelivr.net/gh/hydraponique/roscomvpn-geosite/release/mihomo/whitelist.mrs
-    path: ./rule-sets/whitelist.mrs
+
+listeners:
+  - name: warp-inbound
+    type: mixed
+    port: 10708
+    listen: 0.0.0.0
+    udp: true
+    proxy: warp
+  - name: non_ru-inbound
+    type: mixed
+    port: 10709
+    listen: 0.0.0.0
+    udp: true
+    proxy: non_ru-auto
