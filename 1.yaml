@@ -15,11 +15,11 @@ secret: mihomo
 external-ui: ui # --> http://127.0.0.1:10706/ui/#/setup?hostname=127.0.0.1&port=10706&secret=mihomo <--
 external-ui-url: https://github.com/MetaCubeX/metacubexd/releases/latest/download/compressed-dist.tgz
 
-bind-address: "0.0.0.0"
-external-controller: 0.0.0.0:10706
-allow-lan: true
+bind-address: "127.0.0.1"
+external-controller: 127.0.0.1:10706
+allow-lan: false
 external-controller-cors:
-  allow-private-network: true
+  allow-private-network: false
   allow-origins:
     - '*'
 
@@ -46,7 +46,7 @@ dns:
     'geosite:openai,spotify,twitch,anthropic,xai,tiktok':
       - https://dns.malw.link/dns-query
     'geosite:google-deepmind':
-      - https://dns.malw.link/dns-query
+      - https://sync.bezmezhau.com/dns-query
   nameserver:
     - https://1.1.1.1/dns-query
     - https://dns.google/dns-query
@@ -122,10 +122,11 @@ sub-rules:
     - GEOSITE,private,DIRECT
   reject:
     - IP-CIDR,::/0,REJECT,no-resolve
-    - RULE-SET,oisd_big,REJECT-DROP
-    - GEOSITE,category-ads-all,REJECT-DROP
+    - RULE-SET,oisd_big,REJECT
+    - GEOSITE,category-ads-all,REJECT
   russia:
     - GEOSITE,category-ru,DIRECT
+    - GEOIP,ru,DIRECT,no-resolve
     - RULE-SET,whitelist,DIRECT
     - RULE-SET,wld,DIRECT
     - RULE-SET,wldc,DIRECT
