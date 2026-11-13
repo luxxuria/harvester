@@ -44,7 +44,7 @@ dns:
     - MATCH,fake-ip
   nameserver-policy:
     'geosite:openai,spotify,twitch,anthropic,xai,tiktok':
-      - https://dns.malw.link/dns-query
+      - https://dns.zapret.moe/dns-query
     'geosite:google-deepmind':
       - https://sync.bezmezhau.com/dns-query
   nameserver:
