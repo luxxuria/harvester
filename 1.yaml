@@ -43,8 +43,8 @@ dns:
     - GEOSITE,private,real-ip
     - MATCH,fake-ip
   nameserver-policy:
-    'geosite:openai,spotify,twitch,anthropic,xai,tiktok':
-      - https://dns.zapret.moe/dns-query
+    'geosite:openai,spotify,twitch,anthropic,xai':
+      - https://sync.bezmezhau.com/dns-query
     'geosite:google-deepmind':
       - https://sync.bezmezhau.com/dns-query
   nameserver:
@@ -132,6 +132,7 @@ sub-rules:
     - RULE-SET,wldc,DIRECT
   non-ru:
     - DOMAIN-SUFFIX,openrouter.ai,non_ru-auto
+    - GEOSITE,tiktok,non_ru-auto
     - GEOSITE,youtube,PROXY
     - GEOSITE,google-deepmind,PROXY
   direct:
