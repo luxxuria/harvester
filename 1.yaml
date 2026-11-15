@@ -1,10 +1,8 @@
 mixed-port: 10707
-mode: rule
 log-level: info
 ipv6: false
 unified-delay: true
 tcp-concurrent: true
-find-process-mode: strict
 geodata-loader: standard
 geo-auto-update: true
 geo-update-interval: 24
@@ -18,15 +16,10 @@ external-ui-url: https://github.com/MetaCubeX/metacubexd/releases/latest/downloa
 bind-address: "127.0.0.1"
 external-controller: 127.0.0.1:10706
 allow-lan: false
-external-controller-cors:
-  allow-private-network: false
-  allow-origins:
-    - '*'
 
 dns:
   enable: true
   cache-algorithm: arc
-  prefer-h3: false
   use-hosts: false
   use-system-hosts: false
   respect-rules: false
@@ -37,7 +30,6 @@ dns:
     - 8.8.8.8
     - 9.9.9.9
   enhanced-mode: fake-ip
-  fake-ip-range: 198.18.0.1/16
   fake-ip-filter-mode: rule
   fake-ip-filter:
     - GEOSITE,private,real-ip
@@ -69,14 +61,14 @@ anchors:
   health_check: &health_check
     health-check:
       enable: true
-      url: https://connectivitycheck.gstatic.com/generate_204
+      url: https://www.youtube.com/generate_204
       interval: 60
       timeout: 3000
       lazy: false
 
   url_test: &url_test
     type: url-test
-    url: https://connectivitycheck.gstatic.com/generate_204
+    url: https://www.youtube.com/generate_204
     interval: 60
     timeout: 3000
     lazy: false
@@ -121,7 +113,6 @@ sub-rules:
     - RULE-SET,private-ips,DIRECT,no-resolve
     - GEOSITE,private,DIRECT
   reject:
-    - IP-CIDR,::/0,REJECT,no-resolve
     - RULE-SET,oisd_big,REJECT
     - GEOSITE,category-ads-all,REJECT
   russia:
@@ -139,6 +130,7 @@ sub-rules:
     - GEOSITE,google,DIRECT
     - GEOSITE,pinterest,DIRECT
     - GEOSITE,reddit,DIRECT
+    - GEOSITE,deepseek,DIRECT
 
 rule-providers:
   private-ips:
