@@ -61,14 +61,14 @@ anchors:
   health_check: &health_check
     health-check:
       enable: true
-      url: https://www.youtube.com/generate_204
+      url: https://web.telegram.org
       interval: 60
       timeout: 3000
       lazy: false
 
   url_test: &url_test
     type: url-test
-    url: https://www.youtube.com/generate_204
+    url: https://web.telegram.org
     interval: 60
     timeout: 3000
     lazy: false
@@ -80,8 +80,8 @@ anchors:
     interval: 3600
     <<: *health_check
 
-  warp-list:   &warp-list   https://raw.githubusercontent.com/luxxuria/harvester/refs/heads/main/warp-endpoints.list
-  non_ru-list: &non_ru-list https://raw.githubusercontent.com/luxxuria/harvester/refs/heads/main/non_ru.txt
+  warp-list:   &warp-list   https://fastly.jsdelivr.net/gh/luxxuria/harvester@main/warp-endpoints.list
+  non_ru-list: &non_ru-list https://fastly.jsdelivr.net/gh/luxxuria/harvester@main/non_ru.txt
   
   ip:        &ip        {type: http, interval: 86400, behavior: ipcidr,    format: mrs}
   domain:    &domain    {type: http, interval: 86400, behavior: domain,    format: mrs}
