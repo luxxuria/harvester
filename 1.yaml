@@ -8,6 +8,7 @@ geo-auto-update: true
 geo-update-interval: 24
 geox-url:
   geosite: "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geosite.dat"
+  geoip: "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geoip.dat"
 
 secret: mihomo
 external-ui: ui # --> http://127.0.0.1:10706/ui/#/setup?hostname=127.0.0.1&port=10706&secret=mihomo <--
@@ -22,7 +23,7 @@ dns:
   cache-algorithm: arc
   use-hosts: false
   use-system-hosts: false
-  respect-rules: false
+  respect-rules: true
   listen: 0.0.0.0:1053
   ipv6: false
   default-nameserver:
@@ -36,13 +37,21 @@ dns:
     - MATCH,fake-ip
   nameserver-policy:
     'geosite:openai,spotify,twitch,anthropic,xai':
-      - https://sync.bezmezhau.com/dns-query
+      - https://dns.zapret.moe/dns-query
     'geosite:google-deepmind':
-      - https://sync.bezmezhau.com/dns-query
+      - https://dns.zapret.moe/dns-query
+  proxy-server-nameserver:
+    - https://1.1.1.1/dns-query
+    - https://dns.google/dns-query
+    - https://dns.quad9.net/dns-query
   nameserver:
     - https://1.1.1.1/dns-query
     - https://dns.google/dns-query
     - https://dns.quad9.net/dns-query
+
+#  https://dns.zapret.moe/dns-query
+#  https://dns.malw.link/dns-query
+#  https://dns.bezmezhau.com/dns-query
 
 sniffer:
   enable: true
@@ -64,14 +73,14 @@ anchors:
       url: https://web.telegram.org
       interval: 60
       timeout: 3000
-      lazy: false
+      lazy: true
 
   url_test: &url_test
     type: url-test
     url: https://web.telegram.org
     interval: 60
     timeout: 3000
-    lazy: false
+    lazy: true
     max-failed-times: 3
     tolerance: 50
 
@@ -80,24 +89,28 @@ anchors:
     interval: 3600
     <<: *health_check
 
-  warp-list:   &warp-list   https://fastly.jsdelivr.net/gh/luxxuria/harvester@main/warp-endpoints.list
-  non_ru-list: &non_ru-list https://fastly.jsdelivr.net/gh/luxxuria/harvester@main/non_ru.txt
-  
+  warp-list:    &warp-list    https://fastly.jsdelivr.net/gh/luxxuria/harvester@main/warp-endpoints.list
+  non_ru-list:  &non_ru-list  https://fastly.jsdelivr.net/gh/luxxuria/harvester@main/non_ru.txt
+  igareck-list: &igareck-list https://fastly.jsdelivr.net/gh/igareck/vpn-configs-for-russia@main/WHITE-CIDR-RU-all.txt
+
   ip:        &ip        {type: http, interval: 86400, behavior: ipcidr,    format: mrs}
   domain:    &domain    {type: http, interval: 86400, behavior: domain,    format: mrs}
   classical: &classical {type: http, interval: 86400, behavior: classical, format: yaml}
 
 
 proxy-providers:
-  warp_provider:        {<<: *http, url: *warp-list,   path: ./providers/warp.yaml, interval: 86400}
-  non_ru_provider:      {<<: *http, url: *non_ru-list, path: ./providers/non_ru.yaml}
-  non_ru_provider-auto: {<<: *http, url: *non_ru-list, path: ./providers/non_ru-auto.yaml}
+  warp-provider:    {<<: *http, url: *warp-list,    path: ./providers/warp.yaml, interval: 86400}
+  non_ru-provider:  {<<: *http, url: *non_ru-list,  path: ./providers/non_ru.yaml}
+  igareck-provider: {<<: *http, url: *igareck-list, path: ./providers/igareck.yaml}
+
 
 proxy-groups:
-  - {name: PROXY,         <<: *select,   proxies: [warp, non_ru-select, non_ru-auto]}
-  - {name: warp,          <<: *url_test, use:     [warp_provider]}
-  - {name: non_ru-auto,   <<: *url_test, use:     [non_ru_provider-auto]}
-  - {name: non_ru-select, <<: *select,   use:     [non_ru_provider]}
+  - {name: PROXY,         <<: *select,   proxies: [warp, non_ru-select, non_ru-auto, igareck-auto]}
+  - {name: warp,          <<: *url_test, use:     [warp-provider]}
+  - {name: non_ru-auto,   <<: *url_test, use:     [non_ru-provider]}
+  - {name: igareck-auto,  <<: *url_test, use:     [igareck-provider]}
+  - {name: non_ru-select, <<: *select,   use:     [non_ru-provider]}
+
 
 rules:
   - SUB-RULE,(NOT,((DOMAIN,private))),private
