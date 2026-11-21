@@ -115,8 +115,8 @@ proxy-groups:
 rules:
   - SUB-RULE,(NOT,((DOMAIN,private))),private
   - SUB-RULE,(NOT,((DOMAIN,reject))),reject
-  - SUB-RULE,(NOT,((DOMAIN,russia))),russia
   - SUB-RULE,(NOT,((DOMAIN,non-ru))),non-ru
+  - SUB-RULE,(NOT,((DOMAIN,russia))),russia
   - SUB-RULE,(NOT,((DOMAIN,direct))),direct
 
   - MATCH,PROXY
@@ -128,17 +128,18 @@ sub-rules:
   reject:
     - RULE-SET,oisd_big,REJECT
     - GEOSITE,category-ads-all,REJECT
+  non-ru:
+    - DOMAIN-SUFFIX,openrouter.ai,non_ru-auto
+    - GEOSITE,tiktok,non_ru-auto
+    - GEOSITE,youtube,PROXY
+    - GEOSITE,google-play,PROXY
+    - GEOSITE,google-deepmind,PROXY
   russia:
     - GEOSITE,category-ru,DIRECT
     - GEOIP,ru,DIRECT,no-resolve
     - RULE-SET,whitelist,DIRECT
     - RULE-SET,wld,DIRECT
     - RULE-SET,wldc,DIRECT
-  non-ru:
-    - DOMAIN-SUFFIX,openrouter.ai,non_ru-auto
-    - GEOSITE,tiktok,non_ru-auto
-    - GEOSITE,youtube,PROXY
-    - GEOSITE,google-deepmind,PROXY
   direct:
     - GEOSITE,google,DIRECT
     - GEOSITE,pinterest,DIRECT
