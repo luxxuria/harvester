@@ -24,7 +24,7 @@ dns:
   use-hosts: false
   use-system-hosts: false
   respect-rules: true
-  listen: 0.0.0.0:1053
+  listen: 127.0.0.1:1053
   ipv6: false
   default-nameserver:
     - 1.1.1.1
