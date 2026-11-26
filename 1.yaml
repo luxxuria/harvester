@@ -37,7 +37,7 @@ dns:
     - MATCH,fake-ip
   nameserver-policy:
     'geosite:openai,spotify,twitch,anthropic,xai,google-deepmind':
-      - https://dns.zapret.moe/dns-query
+      - https://dns.bezmezhau.com/dns-query
   proxy-server-nameserver:
     - https://1.1.1.1/dns-query
     - https://dns.google/dns-query
